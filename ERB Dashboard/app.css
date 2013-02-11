@@ -1,0 +1,20 @@
+#toolbar {
+	margin: 5px;
+}
+
+.btn {
+	background: #333;
+	margin-left: 8px;
+}
+
+.label {
+	text-align: center;
+	width: 75px;
+	padding: 4px;
+	border-radius: 3px;
+}
+
+.selected { background: #3F84A4; }
+.green    { background: #C6EFCE; }
+.red      { background: #FFC7CE; }
+.yellow   { background: #FFEB9C; }
