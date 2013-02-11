@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 2.1.3
+// RPM Heat Map - Version 2.1.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -77,7 +77,7 @@ Ext.define('CustomApp', {
 				listeners  : {
 					change : function() {
 						Ext.onReady(function() {
-							App.viewport.update();
+							if (App.rpmTree.getSelectedRPMNodes().length != 0) App.viewport.update();
 						});
 					}
 				}
