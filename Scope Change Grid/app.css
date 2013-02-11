@@ -1,0 +1,13 @@
+.node {
+	border-radius : 5px;
+	height        : 18px;
+	line-height   : 18px;
+	text-align    : center;
+}
+
+.sample { margin: 3px 0; }
+
+.green  { background: #C6EFCE; }
+.red    { background: #FFC7CE; }
+.yellow { background: #FFEB9C; }
+.grey   { background: #E7EBEE; }

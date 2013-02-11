@@ -1,0 +1,42 @@
+#rpmTree .x-grid-cell-inner .count, .icon {
+	display       : inline-block;
+	text-align    : center;
+	border-radius : 3px;
+	font-size     : 9px;
+	height        : 13px;
+	line-height   : 12px;
+}
+
+#rpmTree .x-grid-cell-inner .count {
+	width            : 25px;
+	border           : 1px solid #B7841F;
+	
+	background-image : linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -o-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -moz-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -webkit-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -ms-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -webkit-gradient(
+		linear,
+		left bottom,
+		left top,
+		color-stop(0.4, rgb(255,218,117)),
+		color-stop(0.85, rgb(255,255,186))
+	);
+}
+
+.icon {
+	width      : 13px;
+	margin     : 1px 5px 1px 0;
+	background : #3F84A4;
+	color      : #FFF;
+}
+
+.est {
+	background : #FFDA75;
+	color      : #000;
+}
+
+.summary {
+	font-weight: bold;
+}

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html>
+<head>
+    <title>ERM_v1</title>
+
+    <script type="text/javascript" src="/apps/2.0p5/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+            // Enhanced Release Metrics - Version 1.0
+            // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
+            // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
+            Ext.define('CustomApp', {
+                extend: 'Rally.app.App',
+                componentCls: 'app',
+            
+                items: [{
+                    xtype: 'container',
+                    id: 'toolbar',
+                    layout: 'hbox'
+                },{
+                    xtype: 'container',
+                    id: 'viewport'
+                }],
+            
+                launch: function() {
+                    Ext.state.Manager.setProvider(new Ext.state.LocalStorageProvider());
+                    var me = this;
+                    var initialize = true;
+                    me.down('#toolbar').add({
+                        xtype       : 'rallyreleasecombobox',
+                        id          : 'releasePicker',
+                        fieldLabel  : 'Release:',
+                        labelWidth  : 40,
+                        width       : 250,
+                        margin      : 5,
+                        stateful    : true,
+                        stateId     : 'erm_release',
+                        stateEvents : [ 'change' ],
+                        getState    : function() { return { value: this.getValue() }; },
+                        applyState  : function(state) { this.setValue(state.value); },
+                        listeners: {
+                            change: function() {
+                                if (!initialize) me.getGridData();
+                            },
+                            ready: function() {
+                                me.down('#toolbar').add({
+                                    xtype       : 'rallymultiobjectpicker',
+                                    id          : 'tagPicker',
+                                    modelType   : 'Tag',
+                                    fieldLabel  : 'Tags:',
+                                    labelWidth  : 25,
+                                    width       : 200,
+                                    margin      : 5,
+                                    stateful    : true,
+                                    stateId     : 'erm_tags',
+                                    stateEvents : [ 'collapse' ],
+                                    getState    : function() { return { value: this.getValue() }; },
+                                    applyState  : function(state) { this.setValue(state.value); },
+                                    listeners   : {
+                                        blur: function() {
+                                            me.down('#tagPicker').collapse();
+                                        },
+                                        collapse: function() {
+                                            me.getGridData();
+                                        },
+                                        added: function() {
+                                            me.down('#toolbar').add({
+                                                xtype : 'container',
+                                                id    : 'tagIcons',
+                                                listeners : {
+                                                    added : function() {
+                                                        me.getGridData();
+                                                        initialize = false;
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                },
+            
+                getGridData: function() {
+                    Ext.getBody().mask('Loading...');
+                    var me         = this;
+                    var gridData   = {};
+                    var totalsData = {
+                        scheduledWorkItems : 0,
+                        acceptedWorkItems  : 0,
+                        scheduledPoints    : 0,
+                        acceptedPoints     : 0,
+                        testCases          : 0,
+                        passingTestCases   : 0,
+                        defects            : 0,
+                        activeDefects      : 0
+                    };
+                    
+                    var filter = [];
+                    var tagIcons = '';
+                    Ext.Array.each(me.down('#tagPicker').getValue(), function(tag) {
+                        filter.push({ property: 'Tags.Name', operator: 'contains',  value: tag.Name });
+                        tagIcons += '<div class="icon">' + tag.Name + '</div>';
+                    });
+                    me.down('#tagIcons').removeAll();
+                    me.down('#tagIcons').add({
+                        border: 0,
+                        html: tagIcons
+                    });
+            
+                    me.down('#viewport').removeAll();
+                    var loader = Ext.create('Rally.data.WsapiDataStore', {
+                        model: 'UserStory',
+                        fetch: [
+                            'Defects',
+                            'FormattedID',
+                            'FoundInBuild',
+                            'Iteration',
+                            'LastVerdict',
+                            'Name',
+                            'ObjectID',
+                            'Owner',
+                            'PlanEstimate',
+                            'Project',
+                            'Severity',
+                            'ScheduleState',
+                            'State',
+                            'TestCases'
+                        ],
+                        filters: filter.concat(me.down('#releasePicker').getQueryFromSelected()),
+                        listeners: {
+                            load: function(model, data) {
+                                if (loader.currentPage == 1 && data.length == 0) {
+                                    Ext.getBody().unmask();
+                                    Ext.Msg.alert('Error','No data was found matching the search criteria.');
+                                    pageLoader.clearListeners();
+                                }
+                                Ext.Array.each(data, function(s) {
+                                    if (s.get('Iteration') != undefined) {
+                                        //Make sure node exists in object
+                                        if (gridData[s.get('Iteration').Name] == undefined) gridData[s.get('Iteration').Name] = {};
+                                        if (gridData[s.get('Iteration').Name][s.get('Project').Name] == undefined)
+                                            gridData[s.get('Iteration').Name][s.get('Project').Name] = {
+                                                iterationOID       : s.get('Iteration').ObjectID,
+                                                scheduledWorkItems : 0,
+                                                acceptedWorkItems  : 0,
+                                                scheduledPoints    : 0,
+                                                acceptedPoints     : 0,
+                                                testCases          : 0,
+                                                passingTestCases   : 0,
+                                                defects            : 0,
+                                                activeDefects      : 0,
+                                                detail_WorkItems   : [],
+                                                detail_TestCases   : [],
+                                                detail_Defects     : []
+                                            };
+                                        //Add attributes to node
+                                        var node = gridData[s.get('Iteration').Name][s.get('Project').Name];
+                                        //Accepted/Unaccepted Story
+                                        var points = s.get('PlanEstimate');
+                                        if (s.get('ScheduleState') == 'Accepted') {
+                                            if (points) node.acceptedPoints += points;
+                                            node.acceptedWorkItems++;
+                                        }
+                                        //Story Counts
+                                        if (points) node.scheduledPoints += points;
+                                        node.scheduledWorkItems++;
+                                        //Add User Story detail to work item array
+                                        node.detail_WorkItems.push({
+                                            fid    : '<a href="https://rally1.rallydev.com/#/detail/userstory/' + s.get('ObjectID') + '">' + s.get('FormattedID') + '</a>',
+                                            name   : s.get('Name'),
+                                            points : points ? points : 0,
+                                            state  : s.get('ScheduleState')
+                                        });
+                                        //Parse Test cases
+                                        Ext.Array.each(s.get('TestCases'), function(t) {
+                                            if (t.LastVerdict == 'Pass') node.passingTestCases++;
+                                            node.testCases++;
+                                            node.detail_TestCases.push({
+                                                fid     : '<a href="https://rally1.rallydev.com/#/detail/testcase/' + t.ObjectID + '">' + t.FormattedID + '</a>',
+                                                name    : t.Name,
+                                                owner   : t.Owner._refObjectName,
+                                                verdict : t.LastVerdict ? t.LastVerdict : 'N/A'
+                                            });
+                                        });
+                                        //Parse Deftects
+                                        Ext.Array.each(s.get('Defects'), function(d) {
+                                            if (d.State == 'Open') node.activeDefects++;
+                                            node.defects++;
+                                            node.detail_Defects.push({
+                                                fid       : '<a href="https://rally1.rallydev.com/#/detail/defect/' + d.ObjectID + '">' + d.FormattedID + '</a>',
+                                                name      : d.Name,
+                                                severity  : d.Severity,
+                                                foundin   : d.FoundInBuild,
+                                                state     : d.State
+                                            });
+                                        });
+                                    }
+                                    //Add total attributes
+                                    if (s.get('ScheduleState') == 'Accepted') {
+                                        if (points) totalsData.acceptedPoints += points;
+                                        totalsData.acceptedWorkItems++;
+                                    }
+                                    if (points) totalsData.scheduledPoints += points;
+                                    totalsData.scheduledWorkItems++;
+                                    Ext.Array.each(s.get('TestCases'), function(t) {
+                                        if (t.LastVerdict == 'Pass') totalsData.passingTestCases++;
+                                        totalsData.testCases++; 
+                                    });
+                                    Ext.Array.each(s.get('Defects'), function(d) {
+                                        if (d.State == 'Open') totalsData.activeDefects++;
+                                        totalsData.defects++;
+                                    });
+                                });
+                            }
+                        }
+                    });
+                    var pageLoader = loader.loadPages({
+                        callback: function() {
+                            var node;
+                            for (i in gridData) {
+                                for (p in gridData[i]) {
+                                    node = gridData[i][p];                        
+                                    var acceptedPointsPercent = (node.acceptedPoints / node.scheduledPoints) * 100;
+                                    isFinite(acceptedPointsPercent) ? acceptedPointsPercent == 100 ? node.acceptedPointsPercent = '<span val=":">' + acceptedPointsPercent + '%</span>' : node.acceptedPointsPercent = '<span val="' + Math.round(acceptedPointsPercent) + '">' + Math.round(acceptedPointsPercent) + '%</span>' : node.acceptedPointsPercent = '<span val="0">0%</span>';
+                                    node.remainingPoints = node.scheduledPoints - node.acceptedPoints;
+                                    var acceptedWorkItemsPercent = (node.acceptedWorkItems / node.scheduledWorkItems) * 100;
+                                    isFinite(acceptedWorkItemsPercent) ? acceptedWorkItemsPercent == 100 ? node.acceptedWorkItemsPercent = '<span val=":">' + acceptedWorkItemsPercent + '%</span>' : node.acceptedWorkItemsPercent = '<span val="' + Math.round(acceptedWorkItemsPercent) + '">' + Math.round(acceptedWorkItemsPercent) + '%</span>' : node.acceptedWorkItemsPercent = '<span val="0">0%</span>';
+                                    node.remainingWorkItems = node.scheduledWorkItems - node.acceptedWorkItems;
+                                }
+                            }
+            
+                            //Calculate percentage rates
+                            var totalAcceptedPointsPercent = (totalsData.acceptedPoints / totalsData.scheduledPoints) * 100;
+                            var totalAcceptedWorkItemsPercent = (totalsData.acceptedWorkItems / totalsData.scheduledWorkItems) * 100;
+                            isFinite(totalAcceptedPointsPercent) ? totalsData.acceptedPointsPercent = Math.round(totalAcceptedPointsPercent) + '%' : totalsData.percentAccepted = '0%';
+                            totalsData.remainingPoints = totalsData.scheduledPoints - totalsData.acceptedPoints;
+                            isFinite(totalAcceptedWorkItemsPercent) ? totalsData.acceptedWorkItemsPercent = Math.round(totalAcceptedWorkItemsPercent) + '%' : totalsData.acceptedWorkItemsPercent = '0%';
+                            totalsData.remainingWorkItems = totalsData.scheduledWorkItems - totalsData.acceptedWorkItems;
+                            totalsData.title = 'Totals:';
+                            
+                            Ext.getBody().unmask();
+                            me.down('#viewport').add({
+                                xtype: 'rallygrid',
+                                model: 'UserStory',
+                                cls: 'totalsGrid',
+                                showPagingToolbar: false,
+                                hideHeaders: true,
+                                disableSelection: true,
+                                store: Ext.create('Rally.data.custom.Store', {
+                                    data: [totalsData],
+                                    pageSize: 1
+                                }),
+                                columnCfgs: [
+                                    { dataIndex: 'title',                 width: 370               },
+                                    { dataIndex: 'scheduledWorkItems',    flex: 1, align: 'center' },
+                                    { dataIndex: 'acceptedWorkItems',     flex: 1, align: 'center' },
+                                    { dataIndex: 'scheduledPoints',       flex: 1, align: 'center' },
+                                    { dataIndex: 'acceptedPoints',        flex: 1, align: 'center' },
+                                    { dataIndex: 'acceptedPointsPercent', flex: 1, align: 'center' },
+                                    { dataIndex: 'remainingPoints',       flex: 1, align: 'center' },
+                                    { dataIndex: 'testCases',             flex: 1, align: 'center' },
+                                    { dataIndex: 'passingTestCases',      flex: 1, align: 'center' },
+                                    { dataIndex: 'defects',               flex: 1, align: 'center' },
+                                    { dataIndex: 'activeDefects',         flex: 1, align: 'center' }
+                                ]
+                            });
+            
+                            var dataStore = [];
+                            for (i in gridData) {
+                                for (p in gridData[i]) {
+                                    node = gridData[i][p];
+                                    node.iteration = '<a val="' + i + '" href="https://rally1.rallydev.com/#/detail/iteration/' + gridData[i][p].iterationOID + '">' + i + '</a>';
+                                    node.project = p;
+                                    dataStore.push(node);
+                                }
+                            }
+                            me.down('#viewport').add({
+                                xtype: 'rallygrid',
+                                store: Ext.create('Rally.data.custom.Store', {
+                                    data: dataStore,
+                                    sorters: [
+                                        { property: 'iteration', direction: 'ASC' },
+                                        { property: 'project',   direction: 'ASC' }
+                                    ],
+                                    pageSize: 25
+                                }),
+                                columnCfgs: [
+                                    { text: 'Iteration',            dataIndex: 'iteration',             width: 185               },
+                                    { text: 'Project',              dataIndex: 'project',               width: 185               },
+                                    { text: 'Scheduled Work Items', dataIndex: 'scheduledWorkItems',    flex: 1, align: 'center' },
+                                    { text: 'Accepted Work Items',  dataIndex: 'acceptedWorkItems',     flex: 1, align: 'center' },
+                                    { text: 'Planned Velocity',     dataIndex: 'scheduledPoints',       flex: 1, align: 'center' },
+                                    { text: 'Accepted',             dataIndex: 'acceptedPoints',        flex: 1, align: 'center' },
+                                    { text: 'Percent Accepted',     dataIndex: 'acceptedPointsPercent', flex: 1, align: 'center' },
+                                    { text: 'Remaining',            dataIndex: 'remainingPoints',       flex: 1, align: 'center' },
+                                    { text: 'Total Test Cases',     dataIndex: 'testCases',             flex: 1, align: 'center' },
+                                    { text: 'Passing Test Cases',   dataIndex: 'passingTestCases',      flex: 1, align: 'center' },
+                                    { text: 'Total Defects',        dataIndex: 'defects',               flex: 1, align: 'center' },
+                                    { text: 'Active Defects',       dataIndex: 'activeDefects',         flex: 1, align: 'center' }
+                                ],
+                                listeners: {
+                                    itemclick: function(view, record, item, index, evt) {
+                                        var column = view.getPositionByEvent(evt).column;
+                                        if (column >= 2 && column <= 7) {
+                                            showDetailPopup('Work Items',['points','state']);
+                                        } else if (column == 8 || column == 9) {
+                                            showDetailPopup('Test Cases',['owner','verdict']);
+                                        } else if (column == 10 || column == 11) {
+                                            showDetailPopup('Defects',['severity','found in','state']);
+                                        }
+                                    
+                                        function showDetailPopup(detail_type, special_columns) {
+                                            var columns = [
+                                                { text: 'ID',   dataIndex: 'fid',  width: 60 },
+                                                { text: 'Name', dataIndex: 'name', flex: 1   }
+                                            ];
+                                            Ext.Array.each(special_columns, function(column_name) {
+                                                columns.push({
+                                                    text: toTitleCase(column_name),
+                                                    dataIndex: column_name.replace(' ',''),
+                                                    width: 100,
+                                                    align: 'center'
+                                                });
+                                            });
+                                            this.popup = Ext.create('Rally.ui.dialog.Dialog', {
+                                                id: 'popup',
+                                                width: 750,
+                                                height: 360,
+                                                layout: {
+                                                    align: 'stretch',
+                                                    type: 'hbox'
+                                                },
+                                                title: detail_type + ' Detail:',
+                                                autoShow: true,
+                                                buttonAlign: 'center',
+                                                buttons: [{ 
+                                                    text: 'Ok',
+                                                    listeners: {
+                                                        click: function() {
+                                                            this.popup.destroy();
+                                                        },
+                                                        scope: this
+                                                    }
+                                                }],
+                                                items: [
+                                                    {
+                                                        xtype: 'rallygrid',
+                                                        width: 750,
+                                                        store: Ext.create('Rally.data.custom.Store', {
+                                                            data: record.data['detail_' + detail_type.replace(' ','')],
+                                                            sorters: [{ property: 'fid', direction: 'ASC' }],
+                                                            pageSize: 10
+                                                        }),
+                                                        columnCfgs: columns
+                                                    }
+                                                ]
+                                            });
+            
+                                            function toTitleCase(str) {
+                                                return str.replace(/\w\S*/g, function(txt) {
+                                                	return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+                                                });
+                                            }
+            
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            Rally.launchApp('CustomApp', {
+                name: 'ERM_v1'
+            });
+        });
+    </script>
+
+    <style type="text/css">
+        .totalsGrid .x-grid-cell {
+        	font-weight: bold !important;
+        }
+        
+        .icon {
+        	overflow      : hidden;
+        	text-align    : center;
+        	width         : 100px;
+        	border-radius : 3px;
+        	border        : 1px solid #C6C6C6;
+        	height        : 22px;
+        	line-height   : 21px;
+        	margin        : 5px 5px 0 0;
+        	display       : inline-block;
+        }    </style>
+</head>
+<body></body>
+</html>

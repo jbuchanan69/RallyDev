@@ -1,0 +1,393 @@
+// Scope Change Grid - Version 5.0
+// Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
+// Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
+Ext.define('CustomApp', {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+
+    layout:'border',
+	defaults: {
+		collapsible : true,
+		collapsed   : false,
+		autoScroll  : true,
+		split       : true
+	},
+	items: [{
+	    title       : 'Settings',
+	    id          : 'popout',
+	    region      : 'west',
+	    margins     : '5 0 0 0',
+	    width       : 300,
+	    tools: [{ 
+	        id: 'help',
+	        handler: function() {
+				Ext.create('Rally.ui.dialog.Dialog', {
+				    autoShow: true,
+				    closable: true,
+				    draggable: true,
+				    width: 325,
+				    title: 'Scope Change Grid - Help',
+				    items: {
+				        xtype: 'component',
+				        html: '                                                                              \
+				        	<div id="key">                                                                   \
+				        		<div><b>Scope Change Calculation:</b></div>                                  \
+				        		<div>&nbspX = Scheduled Plan Estimate after planning period has ended.</div> \
+				        		<div>&nbspY = Scheduled points after last day of the iteration.</div>        \
+				        		<div>&nbspScope Change = (Y/X) - 1</div>                                     \
+				        		<div><br /><b>Color Key (By Change %):</div></b>                             \
+				        		<div class="green sample node">&lt10%</div>                                  \
+				        		<div class="yellow sample node">10%-25%</div>                                \
+				        		<div class="red sample node">&gt25%</div>                                    \
+				        	</div>                                                                           \
+				        ',
+				        padding: 10
+				    }
+				});
+	        }
+	    },{
+	    	id: 'refresh',
+	    	handler: function() {
+	    		Ext.onReady(function() {
+	    			App.viewport.update();
+	    		});
+	    	}
+	    }],
+		layout: {
+		    type: 'vbox',
+		    align : 'stretch',
+		    pack  : 'start',
+		},
+		items: [{
+	    	id: 'projectTreePanel', 
+	    	layout: 'fit',
+	    	border: 0,
+	    	flex: 1
+	    },{
+	    	id: 'settingsPanel',
+	    	layout: 'fit',
+	    	height: 125,
+	    	border: 0,
+	    	padding: 10,
+			style: {
+				border  : '1px solid #99BCE8'
+			}
+		}]
+	},{
+		id          : 'viewport',
+    	collapsible : false,
+    	region      : 'center',
+    	margins     : '5 0 0 0'
+	}],
+
+    launch: function() {
+    	App = this;
+    	App.projectTree.init();
+    	App.settingsPanel.init();
+    },
+
+    projectTree: {
+    	init: function() {
+    		Ext.create('Rally.data.WsapiDataStore', {
+    			autoLoad: true,
+    			model: 'Project',
+    			fetch: [ 'Children', 'Name', 'ObjectID' ],
+    			filters: [ { property: 'Parent', value: null } ],
+    			listeners: {
+    				load: function(model, roots) {
+    					var nodes = [];
+    					Ext.Array.each(roots, function(root) {
+    						nodes.push({
+								name : root.get('Name'),
+								text : root.get('Name'),
+								id   : root.get('ObjectID'),
+								leaf : root.raw.Children == undefined || root.raw.Children.length == 0,
+							});
+    					});
+    					//Add tree to UI element
+						App.down('#projectTreePanel').add({
+							xtype        : 'treepanel',
+							id           : 'projectTree',
+							rootVisible  : false,
+							margin       : '-1 0 0 0',
+							simpleSelect : true,
+							store        : Ext.create('Ext.data.TreeStore', {
+								root: {
+									expanded : true,
+									children : nodes
+								}
+							}),
+							listeners: {
+								beforeitemexpand: function(node) {
+									nodes = [];
+									var childLoader = Ext.create('Rally.data.WsapiDataStore', {
+										model: 'Project',
+										fetch: [ 'Children', 'Name', 'ObjectID' ],
+										filters: [ { property: 'Parent.ObjectID', value: node.get('id') } ],
+										listeners: {
+											load: function(model, children) {
+												Ext.Array.each(children, function(child) {
+													nodes.push({
+														name : child.get('Name'),
+														text : child.get('Name'),
+														id   : child.get('ObjectID'),
+														leaf : child.raw.Children == undefined || child.raw.Children.length == 0
+													});
+												});
+											}
+										}
+									});
+									if (node.hasChildNodes() == false) {
+										childLoader.loadPages({
+											callback: function() {
+												Ext.Array.each(nodes.sort(function(a, b) {
+													return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
+												}), function(n) {
+													node.appendChild(n);
+												});
+											}
+										});
+									}
+								}
+							}
+						});		
+    				}
+    			}
+    		});
+    	},
+
+    	getSelectedProjects: function() {
+    		var OIDs = [];
+    		Ext.Array.each(App.down('#projectTree').getSelectionModel().getSelection(), function(node) {
+    			OIDs.push(node.data.id);
+    		});
+    		return OIDs;
+    	}
+    },
+
+    settingsPanel: {
+		init: function() {
+			App.down('#settingsPanel').add({
+				border: 0,
+				defaults: {
+					width: 300,
+					labelWidth: 75
+				},
+				items: [{
+					xtype      : 'rallyiterationcombobox',
+					fieldLabel : 'Min Iteration:',
+					id         : 'minIter'
+				},{
+					xtype      : 'rallyiterationcombobox',
+					fieldLabel : 'Max Iteration:',
+					id         : 'maxIter'
+				},{
+					xtype      : 'spinnerfield',
+					fieldLabel : 'Planning Period:',
+					id         : 'planPeriod',
+					value      : '2 Days',
+					width      : 261,
+					labelWidth : 91,
+					onSpinUp: function() {
+				        var val = parseInt(this.getValue().split(' ')[0]) + 1;
+				        if (val <= 10) this.setValue(val + ' Days');
+				        else Ext.Msg.alert('Error', 'Maximum planning period length is 10 days.')
+				    },
+				    onSpinDown: function() {
+				        var val = parseInt(this.getValue().split(' ')[0]) - 1;
+				        if (val >= 0) this.setValue(val + ' Days');
+				        else Ext.Msg.alert('Error', 'Planning period length must be positive.')
+				    }
+				},{
+					xtype          : 'combo',
+					id             : 'view_selection',
+					fieldLabel     : 'View',
+					width          : 261,
+					labelWidth     : 91,
+					editable       : false,
+					forceSelection : true,
+					queryMode      : 'local',
+					displayField   : 'text',
+					valueField     : 'text',
+					value          : 'Grid',
+					store          : {
+                        fields: ['text'],
+                        data: [
+                        	{ text: 'Grid'  },
+                        	{ text: 'Chart' }
+                        ]
+                    }
+                }]
+			});
+		}
+    },
+
+    viewport: {
+    	update: function() {
+    		App.down('#viewport').removeAll();
+    		Ext.getBody().mask('Loading...');
+    		var selectedProjects = App.projectTree.getSelectedProjects(),
+    			projectNameHash  = {},
+    			activeProjects   = [],
+    			activeIters      = [];
+    		getIters(function(iterData) {
+    			var remaining = 0;
+    			for (iter in iterData) {
+    				remaining++;
+    				getScopeChange(iterData[iter], function() {
+    					if (!--remaining) {
+    						activeIters = activeIters.sort();
+    						var node, nodes = [];
+    						for (p in activeProjects) {
+    							node = {
+    								Team : projectNameHash[activeProjects[p]]
+    							};
+    							for (i in activeIters) {
+    								node[activeIters[i]]                   = iterData[activeIters[i]][activeProjects[p] + '_ScopeChange'];
+    								node[activeIters[i] + '_InitialScope'] = iterData[activeIters[i]][activeProjects[p] + '_InitialScope'];
+    								node[activeIters[i] + '_FinalScope']   = iterData[activeIters[i]][activeProjects[p] + '_FinalScope'];
+    							}
+    							nodes.push(node);
+    						}
+    						drawGrid(nodes, activeIters);
+    					}
+    				});
+    			}
+    		});
+
+    		function getScopeChange(iter, callback) {
+    			getScopeOn(Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(iter.Start), Ext.Date.DAYS, parseInt(App.down('#planPeriod').getValue().split(' ')[0]))), function(initialScope) {
+    				getScopeOn(Rally.util.DateTime.toIsoString(iter.End), function(finalScope) {
+    					for (p in initialScope) {
+    						iter[p + '_InitialScope'] = initialScope[p];
+    						if (finalScope[p] != undefined) {
+    							if (Ext.Array.indexOf(activeProjects, p) == -1) activeProjects.push(p);
+    							if (Ext.Array.indexOf(activeIters, iter.Name) == -1) activeIters.push(iter.Name);
+    							iter[p + '_FinalScope']  = finalScope[p];
+    							iter[p + '_ScopeChange'] = (initialScope[p] == 0) ? ((finalScope[p] == 0) ? 0 : 1) : parseFloat((finalScope[p] / initialScope[p]) - 1) || 0;
+    						}
+    					}
+    					callback();
+    				});
+    			});
+
+    			function getScopeOn(date, callback) {
+    				var	totals = {};
+    				Ext.create('Rally.data.lookback.SnapshotStore', {
+		    			autoLoad: true,
+		    			pageSize: 1000000,
+		    			fetch: ['Iteration','PlanEstimate','Project'],
+		    			filters: [
+		    			    { property: 'Iteration',      operator: 'in', value: iter.OIDs                 },
+		    			    { property: 'PlanEstimate',   operator: '>',  value: 0                         },
+		    				{ property: 'Children',                       value: null                      },
+		    				{ property: '__At',                           value: date                      },
+		    				{ property: '_TypeHierarchy',                 value: 'HierarchicalRequirement' }
+		    			],
+		                listeners: {
+		                	load: function(model, data, success) {
+		                		Ext.Array.each(data, function(s) {
+		                			if (totals[s.get('Project')] == undefined) totals[s.get('Project')] = 0;
+		                			totals[s.get('Project')] += s.get('PlanEstimate') || 0;
+		                		});
+		                		callback(totals);
+		                	}
+		                }
+		            });
+    			}
+    		}
+
+    		function getIters(callback) {
+    			var iterData  = {},
+    				remaining = selectedProjects.length;
+    			Ext.Array.each(selectedProjects, function(projectOID) {
+    				loadProjectIters(projectOID);
+    			});
+
+    			function loadProjectIters(projectOID) {
+    				var loader = Ext.create('Rally.data.WsapiDataStore', {
+	    				model: 'Iteration',
+	    				fetch: ['Name','ObjectID','StartDate','EndDate','Project'],
+	    				context : {
+	    					project: '/project/' + projectOID,
+	    					projectScopeDown: true
+	    				},
+	    				filters: [{
+							property : 'StartDate',
+							operator : '>=',
+							value    : Rally.util.DateTime.toIsoString(App.down('#minIter').getRecord().get('StartDate'))	
+	    				},{
+	    					property : 'EndDate',
+	    					operator : '<=',
+	    					value    : Rally.util.DateTime.toIsoString(App.down('#maxIter').getRecord().get('EndDate'))
+	    				}],
+	    				listeners: {
+	    					load : function(store, data) {
+	    						if (data && data.length) {
+	    							Ext.Array.each(data, function(i) {
+		    							if (iterData[i.get('Name')] == undefined) {
+		    								iterData[i.get('Name')] = {
+		    									Name  : i.get('Name'),
+		    									Start : i.get('StartDate'),
+		    									End   : i.get('EndDate'),
+		    									OIDs  : []
+		    								}
+		    							}
+		    							iterData[i.get('Name')].OIDs.push(i.get('ObjectID'));
+		    							projectNameHash[i.get('Project').ObjectID] = i.get('Project')._refObjectName;
+		    						});
+		    						loader.nextPage();	
+	    						} else {
+	    							onProjectProjectLoaded();
+	    						}
+	    					}
+	    				}
+	    			});
+	    			loader.loadPage(1);	
+    			}
+    			
+    			function onProjectProjectLoaded() {
+    				if (!--remaining) callback(iterData);
+    			}
+
+    		}
+
+    		function drawGrid(nodes, fields) {
+    			var columns = [{
+					text: 'Team', dataIndex: 'Team', flex: 1, minWidth: 200
+				}];
+    			Ext.Array.each(fields, function(i) {
+    				fields.push(i + '_InitialScope');
+    				fields.push(i + '_FinalScope');
+    				columns.push({
+						text      : i,
+						dataIndex : i,
+						width     : 165,
+						resizable : false,
+						renderer  : function(val, meta, record) {
+							if (val === '') return '<div class="node grey">N/A</div>';
+							else return '<div class="node ' + getNodeColor(val) + '"><table width="100%"><tr><td width="50%">' + Math.round(val * 100) + '%</td><td width="50%">' + record.data[i + '_InitialScope'] + ' &rArr; ' + record.data[i + '_FinalScope'] + '</td></tr></table></div>';
+						}
+    				});
+    			});
+
+    			Ext.getBody().unmask();
+    			App.down('#viewport').add({
+					xtype: 'rallygrid',
+					disableSelection: true,
+					store: Ext.create('Rally.data.custom.Store', {
+						data     : nodes,
+						fields   : fields.concat('Team'),
+						pageSize : 100
+					}),
+					columnCfgs: columns
+				});
+
+				function getNodeColor(val) {
+					return (Math.abs(val) <= .1) ? 'green' : (Math.abs(val) <= .25) ? 'yellow' : 'red';
+				}
+    		}
+
+    	}
+    }
+});

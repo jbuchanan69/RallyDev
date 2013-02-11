@@ -1,0 +1,15 @@
+.totalsGrid .x-grid-cell {
+	font-weight: bold !important;
+}
+
+.icon {
+	overflow      : hidden;
+	text-align    : center;
+	width         : 100px;
+	border-radius : 3px;
+	border        : 1px solid #C6C6C6;
+	height        : 22px;
+	line-height   : 21px;
+	margin        : 5px 5px 0 0;
+	display       : inline-block;
+}

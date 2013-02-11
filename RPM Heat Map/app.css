@@ -1,0 +1,54 @@
+#rpmTree .x-grid-cell-inner .count {
+	width            : 25px;
+	border           : 1px solid #B7841F;
+	display          : inline-block;
+	text-align       : center;
+	font-size        : 9px;
+	height           : 13px;
+	line-height      : 12px;
+	background       : #FFE993;
+	border-radius    : 3px;
+	background-image : linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -o-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -moz-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -webkit-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -ms-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
+	background-image : -webkit-gradient(
+		linear,
+		left bottom,
+		left top,
+		color-stop(0.4, rgb(255,218,117)),
+		color-stop(0.85, rgb(255,255,186))
+	);
+}
+
+.label {
+	display       : inline-block;
+	padding       : 2px;
+	width         : 125px;
+	height        : 20px;
+	line-height   : 16px;
+	text-align    : center;
+	border-radius : 3px;
+	margin        : 0 2px 0 -4px;
+}
+
+.key_label {
+	display : inline-block;
+	width   : 90px;
+}
+
+.align {
+	display    : inline-block;
+	text-align : center;
+	width      : 60px;
+}
+
+.green     { background    : #C6EFCE; }
+.red       { background    : #FFC7CE; }
+.yellow    { background    : #FFEB9C; }
+.grey      { background    : #E7EBEE; }
+.key_row   { margin-top    : 5px;     }
+.half      { width         : 60px;    }
+.nodeTitle { padding-right : 20px;    }
+.error     { text-align    : center;  }

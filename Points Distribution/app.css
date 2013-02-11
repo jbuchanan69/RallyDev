@@ -1,0 +1,12 @@
+.app {
+	padding: 5px;
+}
+
+#toolbar {
+	text-align: center;
+}
+
+.filter {
+	display: inline-block;
+	padding-right: 15px;
+}
