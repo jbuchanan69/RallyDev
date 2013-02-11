@@ -1,4 +1,4 @@
-// RPM Story List - Version 1.0
+// RPM Work Item Composition - Version 1.0
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
