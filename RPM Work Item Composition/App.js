@@ -1,4 +1,4 @@
-// RPM Work Item Composition - Version 1.0
+// RPM Work Item Composition - Version 1.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -279,7 +279,7 @@ Ext.define('CustomApp', {
 										dataIndex : 'FID',
 										width     : 60,
 										renderer  : function(val, meta, record) {
-											return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('OID') + '">' + val + '</a>';
+											return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('OID') + '" target="_blank">' + val + '</a>';
 										}
 									},{
 										text      : 'Name',
