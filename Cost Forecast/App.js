@@ -1,4 +1,4 @@
-// Cost Forecast - Version 3.1
+// Cost Forecast - Version 3.1.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -298,55 +298,59 @@ Ext.define('CustomApp', {
     					detailEndTime,
     					storyTime;
 					var gridObj = {};
-	    			Ext.Array.each(descendantOIDs, function(OID) { //Make sure project node exists
-	    				if (gridObj[App.storyData[OID].Project.Name] == undefined)
-	    					gridObj[App.storyData[OID].Project.Name] = {
-	    						Name             : App.storyData[OID].Project.Name,
-	    						OID              : App.storyData[OID].Project.ObjectID,
-								PastIterPoints   : 0,
-								FutureIterPoints : 0,
-								BacklogPoints    : 0,
-								PastIterCount    : 0,
-								FutureIterCount  : 0,
-								BacklogCount     : 0,
-								TotalCost        : 0,
-								TotalPoints      : 0,
-								TotalHours       : 0,
-								TotalCount       : 0,
-								UnestimatedCount : 0,
-								TaskOwners       : [],
-	    					};
+	    			Ext.Array.each(descendantOIDs, function(OID) {
+	    				//Make sure project node exists
+	    				if (App.storyData[OID] != undefined) {
+	    					if (gridObj[App.storyData[OID].Project.Name] == undefined) {
+		    					gridObj[App.storyData[OID].Project.Name] = {
+		    						Name             : App.storyData[OID].Project.Name,
+		    						OID              : App.storyData[OID].Project.ObjectID,
+									PastIterPoints   : 0,
+									FutureIterPoints : 0,
+									BacklogPoints    : 0,
+									PastIterCount    : 0,
+									FutureIterCount  : 0,
+									BacklogCount     : 0,
+									TotalCost        : 0,
+									TotalPoints      : 0,
+									TotalHours       : 0,
+									TotalCount       : 0,
+									UnestimatedCount : 0,
+									TaskOwners       : [],
+		    					};
+		    				}
 
-	    				//Save references
-						story           = App.storyData[OID];
-						node            = gridObj[story.Project.Name];
-						detailStartTime = App.down('#detailStart').getRecord().get('StartDate').getTime();
-						detailEndTime   = App.down('#detailEnd').getRecord().get('StartDate').getTime();
+		    				//Save references
+							story           = App.storyData[OID];
+							node            = gridObj[story.Project.Name];
+							detailStartTime = App.down('#detailStart').getRecord().get('StartDate').getTime();
+							detailEndTime   = App.down('#detailEnd').getRecord().get('StartDate').getTime();
 
-						//Add points to node
-						if (story.Points == 0) node.UnestimatedCount++;
-						if (story.Iteration) {
-							storyTime = new Date(story.Iteration.StartDate).getTime();
-							if (storyTime < detailStartTime) {
-								node.PastIterPoints += story.Points;
-								node.PastIterCount++;
-							} else if (storyTime > detailEndTime) {
-								node.FutureIterPoints += story.Points;
-								node.FutureIterCount++;
+							//Add points to node
+							if (story.Points == 0) node.UnestimatedCount++;
+							if (story.Iteration) {
+								storyTime = new Date(story.Iteration.StartDate).getTime();
+								if (storyTime < detailStartTime) {
+									node.PastIterPoints += story.Points;
+									node.PastIterCount++;
+								} else if (storyTime > detailEndTime) {
+									node.FutureIterPoints += story.Points;
+									node.FutureIterCount++;
+								} else {
+									node[story.Iteration.Name + 'Points'] == undefined ? node[story.Iteration.Name + 'Points'] = story.Points : node[story.Iteration.Name + 'Points'] += story.Points;
+									node[story.Iteration.Name + 'Count'] == undefined ? node[story.Iteration.Name + 'Count'] = 1 : node[story.Iteration.Name + 'Count']++;
+									if (Ext.Array.indexOf(App.viewport.iterations, story.Iteration.Name) == -1) App.viewport.iterations.push(story.Iteration.Name);
+								}
 							} else {
-								node[story.Iteration.Name + 'Points'] == undefined ? node[story.Iteration.Name + 'Points'] = story.Points : node[story.Iteration.Name + 'Points'] += story.Points;
-								node[story.Iteration.Name + 'Count'] == undefined ? node[story.Iteration.Name + 'Count'] = 1 : node[story.Iteration.Name + 'Count']++;
-								if (Ext.Array.indexOf(App.viewport.iterations, story.Iteration.Name) == -1) App.viewport.iterations.push(story.Iteration.Name);
+								node.BacklogPoints += story.Points;
+								node.BacklogCount++;
 							}
-						} else {
-							node.BacklogPoints += story.Points;
-							node.BacklogCount++;
-						}
-						
-						//Add task owners
-	    				Ext.Array.each(story.TaskOwners, function(owner) {
-	    					if (Ext.Array.indexOf(node.TaskOwners, owner) == -1) node.TaskOwners.push(owner);
-	    				});
+							
+							//Add task owners
+		    				Ext.Array.each(story.TaskOwners, function(owner) {
+		    					if (Ext.Array.indexOf(node.TaskOwners, owner) == -1) node.TaskOwners.push(owner);
+		    				});
+	    				}
 	    			});
 
 					//Load total points for cost calculation
