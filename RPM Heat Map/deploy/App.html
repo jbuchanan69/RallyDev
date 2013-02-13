@@ -2,13 +2,13 @@
 <meta charset="UTF-8">
 <html>
 <head>
-    <title>RPM_HM_v2.0</title>
+		<title>RPM_HM_v2.0</title>
 
-    <script type="text/javascript" src="/apps/2.0p5/sdk.js"></script>
+		<script type="text/javascript" src="/apps/2.0p5/sdk.js"></script>
 
-    <script type="text/javascript">
-        Rally.onReady(function() {
-            // RPM Heat Map - Version 2.1.4
+		<script type="text/javascript">
+				Rally.onReady(function() {
+            // RPM Heat Map - Version 2.2
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -300,7 +300,6 @@
             			if (App.rpmTree.getSelectedRPMNodes().length == 0) return; //Nothing to render
             			App.iterPicker.getIterOIDs(function(iterOIDs) {
             				var rpmOIDs = App.rpmTree.getSelectedRPMNodes();
-            				
             				getDataOn(Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2)), 0, function() {
             					getDataOn(Rally.util.DateTime.toIsoString(new Date(App.down('#iterPicker').getRecord().get('EndDate'))), 1, function() {
             						getProjectNames(function() {
@@ -311,7 +310,7 @@
             								gridObj[p].AcceptedByCount  = (gridObj[p].StoryCount   == 0) ? 1 : parseFloat(gridObj[p].AcceptedStoryCount / gridObj[p].StoryCount) || 0.0;
             								gridObj[p].HoursRemaining   = (gridObj[p].TaskEstTotal == 0) ? 1 : parseFloat(gridObj[p].TaskRemTotal / gridObj[p].TaskEstTotal)     || 0.0;
             								gridObj[p].EstVsActHours    = (gridObj[p].TaskEstTotal == 0) ? 1 : parseFloat(gridObj[p].TaskActTotal / gridObj[p].TaskEstTotal)     || 0.0;
-            								//Set overall color based on other values
+            								// Set overall color based on other values
             								if (gridObj[p].AcceptedByCount       <   1  ||
             									gridObj[p].AcceptedByPoints      <   1  ||
             									Math.abs(gridObj[p].ScopeChange) >= .1  ||
@@ -322,9 +321,34 @@
             									Math.abs(gridObj[p].ScopeChange) >= .25 ||
             									gridObj[p].Defects               >   1  ||
             									gridObj[p].Blocks                >   1) gridObj[p].Color = 2; //Red
+            								// Mark stories in the initial scope but not in the final scope as red
+            								Ext.Array.each(gridObj[p].InitialStories, function(s) {
+            									switch (cmpFn(s, gridObj[p].FinalStories)) {
+            										case -1 : s.Color = 2; break;
+            										case 0  : s.Color = 1; break;
+            									}
+            								});
+            								// // Mark stories in the final scope but not in the initial scope as green
+            								Ext.Array.each(gridObj[p].FinalStories, function(s) {
+            									switch (cmpFn(s, gridObj[p].InitialStories)) {
+            										case -1 : s.Color = 0; break;
+            										case 0  : s.Color = 1; break;
+            									}
+            								});
             								gridArray.push(gridObj[p]);
             							}
             							drawGrid();
+            						
+            							function cmpFn(item, cmpStore) {
+            								for (s in cmpStore) {
+            									if (cmpStore[s].ObjectID == item.ObjectID) {                     // Items exists in both stores
+            										if (cmpStore[s].PlanEstimate != item.PlanEstimate) return 0; // Points value has changed
+            										else return 1;                                               // No changes have been made
+            									}
+            								}
+            								return -1;                                                           // Item not in other store
+            							}
+            
             						});
             					});
             				});
@@ -333,7 +357,7 @@
             					Ext.create('Rally.data.lookback.SnapshotStore', {
             						autoLoad: true,
             						pageSize: 1000000,
-            						fetch: ['Blocked','Defects','ObjectID','Project','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
+            						fetch: ['_UnformattedID','Blocked','Defects','Name','ObjectID','Project','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
             						hydrate: ['ScheduleState'],
             						filters: [
             							{ property: '_ItemHierarchy', operator: 'in', value: rpmOIDs                   }, // Descends from selected RPM level
@@ -357,17 +381,21 @@
             											FinalScope         : 0,
             											DefectCount        : 0,
             											BlockCount         : 0,
-            											Color              : 0
+            											Color              : 0,
+            											InitialStories     : [],
+            											FinalStories       : []
             										};
             									}
             									if (idx == 0) { // Querying for data at beginning of the sprint
             										gridObj[s.raw.Project].InitialScope += s.raw.PlanEstimate || 0;
+            										s.raw.Color = -1; gridObj[s.raw.Project].InitialStories.push(s.raw);
             									} else { //Querying for data at the end of the sprint
             										gridObj[s.raw.Project].StoryCount++;
             										gridObj[s.raw.Project].FinalScope   += s.raw.PlanEstimate       || 0;
             										gridObj[s.raw.Project].TaskEstTotal += s.raw.TaskEstimateTotal  || 0;
             										gridObj[s.raw.Project].TaskRemTotal += s.raw.TaskRemainingTotal || 0;
             										gridObj[s.raw.Project].TaskActTotal += s.raw.TaskActualTotal    || 0;
+            										s.raw.Color = -1; gridObj[s.raw.Project].FinalStories.push(s.raw);
             										if (s.raw.Blocked) gridObj[s.raw.Project].BlockCount++;
             										if (s.raw.Defects && s.raw.Defects.length) gridObj[s.raw.Project].DefectCount += s.raw.Defects.length;
             										if (s.raw.ScheduleState == 'Accepted') {
@@ -416,23 +444,31 @@
             					var grid = App.down('#viewport').add({
             						xtype : 'rallygrid',
             						disableSelection: true,
+            						showPagingToolbar: false,
+            						features: [{
+            					        ftype: 'summary'
+            					    }],
             						store : Ext.create('Rally.data.custom.Store', {
-            							data    : gridArray,
-            							sorters : [
+            							data     : gridArray,
+            							sorters  : [
             								{ property: 'AcceptedByPoints', direction: 'DESC' },
             								{ property: 'FinalScope',       direction: 'DESC' }
-            							]
+            							],
+            							pageSize : 1000
             						}),
             						columnCfgs: [{
-            							text      : 'Team',
-            							dataIndex : 'Team',
-            							flex      : 1
+            							text        : 'Team',
+            							dataIndex   : 'Team',
+            							flex        : 1,
+            							summaryType : function() {
+            								return '<div class="qSummary">' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.name + '<br />' + App.down('#iterPicker').getRawValue() + '</div>';
+            							}
             						},{
             							text      : '',
             							dataIndex : 'Color',
-            							width     : 65,
+            							width     : 25,
             							renderer  : function(val) {
-            								return '<div class="' + ['green','yellow','red'][val] + ' label half"></div>';
+            								return '<div class="' + ['green','yellow','red'][val] + ' label square"></div>';
             							}
             						},{
             							text      : 'Actual vs Estimated Hours',
@@ -490,7 +526,89 @@
             							renderer  : function(val, meta, record) {
             								return '<div class="' + getColorFromVal(val, [0,.1], [.1,.25], [.25,1000], record) + ' label"><div class="align">' + Math.round(val * 100) + '%</div><div class="align">' + record.get('InitialScope') + ' &rArr; ' + record.get('FinalScope') +'</div>';
             							}
-            						}]
+            						}],
+            						listeners: {
+            	                        itemclick: function(view, record, item, index, evt) {
+            	                        	var column = view.getPositionByEvent(evt).column;
+            								if (column == 8) {
+            									var initialScopeDate = (Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2) < new Date()) ? Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2) : new Date();
+            									var finalScopeDate   = (new Date(App.down('#iterPicker').getRecord().get('EndDate')) < new Date()) ? new Date(App.down('#iterPicker').getRecord().get('EndDate')) : new Date();
+            	                                this.popup = Ext.create('Rally.ui.dialog.Dialog', {
+            										id         : 'popup',
+            										width      : 1200,
+            										height     : 450,
+            										autoScroll : true,
+            										closable   : true,
+            										draggable  : true,
+            										layout     : {
+            	                                        align : 'stretch',
+            	                                        type  : 'hbox'
+            	                                    },
+            										title    : '<div class="titleBar"><div>' + record.get('Team') + ' - Scope Change Report</div><div class="left">Initial Scope: ' + Rally.util.DateTime.toIsoString(initialScopeDate).substring(0, 10) + '</div><div class="right">Final Scope: ' + Rally.util.DateTime.toIsoString(finalScopeDate).substring(0, 10) + '</div></div>',
+            										autoShow : true,
+            										defaults : {
+            											xtype             : 'rallygrid',
+            											width             : 597,
+            											style             : { border : '1px solid #99BCE8' },
+            											showPagingToolbar : false,
+            											disableSelection  : true,
+            											columnCfgs        : [{
+            												text      : '',
+            												dataIndex : 'Color',
+            												width     : 25,
+            												renderer  : function(val) {
+            													return (val >= 0) ? '<div class="' + ['green','yellow','red'][val] + ' label square">' + ['+','C','-'][val] + '</div>' : '';
+            												}
+            											},{
+            												text      : 'ID',
+            												dataIndex : '_UnformattedID', 
+            												width     : 60,
+            												renderer  : function(val) {
+            	                                        		return 'US' + val;
+            	                                        	}
+            	                                        },{
+            												text      : 'Name',
+            												dataIndex : 'Name',
+            												flex      : 1
+            	                                        },{
+            												text      : 'Plan Estimate',
+            												dataIndex : 'PlanEstimate',
+            												width     : 60,
+            												align     : 'center'
+            	                                        },{
+            												text      : 'State',
+            												dataIndex : 'ScheduleState',
+            												width     : 75,
+            												align     : 'center'
+            	                                        }]
+            	                                    },
+            	                                    items: [{
+            	                                        store : Ext.create('Rally.data.custom.Store', {
+            												data     : record.get('InitialStories'),
+            												sorters  : [
+            													{ property: 'Color',          direction: 'DESC' },
+            													{ property: '_UnformattedID', direction: 'ASC'  }
+            												],
+            												pageSize : 1000
+            	                                        })
+            	                                    },{
+            											xtype : 'container',
+            											width : 4,
+            											cls   : 'split'
+            	                                    },{
+            	                                    	store : Ext.create('Rally.data.custom.Store', {
+            												data     : record.get('FinalStories'),
+            												sorters  : [
+            													{ property: 'Color',          direction: 'DESC' },
+            													{ property: '_UnformattedID', direction: 'ASC'  }
+            												],
+            												pageSize : 1000
+            	                                        })
+            	                                    }]
+            	                                });
+            								}
+            							}
+            						}
             					});
             				}
             
@@ -507,13 +625,13 @@
             	}
             
             });
-            Rally.launchApp('CustomApp', {
-                name: 'RPM_HM_v2.0'
-            });
+						Rally.launchApp('CustomApp', {
+								name: 'RPM_HM_v2.0'
+						});
         });
-    </script>
+		</script>
 
-    <style type="text/css">
+		<style type="text/css">
         #rpmTree .x-grid-cell-inner .count {
         	width            : 25px;
         	border           : 1px solid #B7841F;
@@ -560,12 +678,33 @@
         	width      : 60px;
         }
         
+        .titleBar {
+        	width      : 1100px;
+        	margin     : auto;
+        	text-align : center;
+        }
+        
+        .titleBar .left, .titleBar .right {
+        	width      : 550px;
+        	display    : inline-block;
+        	font-style : italic;
+        }
+        
+        .qSummary {
+        	font-size   : 12px;
+        	line-height : 15px;
+        	font-style  : italic;
+        	color       : #C6C6C6;
+        }
+        
         .green     { background    : #C6EFCE; }
         .red       { background    : #FFC7CE; }
         .yellow    { background    : #FFEB9C; }
         .grey      { background    : #E7EBEE; }
+        .split     { background    : #B5D8EB; }
         .key_row   { margin-top    : 5px;     }
         .half      { width         : 60px;    }
+        .square    { width         : 20px;    }
         .nodeTitle { padding-right : 20px;    }
         .error     { text-align    : center;  }    </style>
 </head>

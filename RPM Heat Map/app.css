@@ -44,11 +44,32 @@
 	width      : 60px;
 }
 
+.titleBar {
+	width      : 1100px;
+	margin     : auto;
+	text-align : center;
+}
+
+.titleBar .left, .titleBar .right {
+	width      : 550px;
+	display    : inline-block;
+	font-style : italic;
+}
+
+.qSummary {
+	font-size   : 12px;
+	line-height : 15px;
+	font-style  : italic;
+	color       : #C6C6C6;
+}
+
 .green     { background    : #C6EFCE; }
 .red       { background    : #FFC7CE; }
 .yellow    { background    : #FFEB9C; }
 .grey      { background    : #E7EBEE; }
+.split     { background    : #B5D8EB; }
 .key_row   { margin-top    : 5px;     }
 .half      { width         : 60px;    }
+.square    { width         : 20px;    }
 .nodeTitle { padding-right : 20px;    }
 .error     { text-align    : center;  }
