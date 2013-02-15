@@ -1,11 +1,11 @@
 {
-    "name": "ERBD_v1.0",
-    "className": "CustomApp",
-    "sdk": "2.0p5",
-    "javascript": [
-        "App.js"
-    ],
-    "css": [
-        "app.css"
-    ]
+		"name": "erb_d",
+		"className": "CustomApp",
+		"sdk": "2.0p5",
+		"javascript": [
+				"App.js"
+		],
+		"css": [
+				"app.css"
+		]
 }
