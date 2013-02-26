@@ -65,13 +65,76 @@ Ext.define('CustomApp', {
 	    	flex: 1
 	    },{
 	    	id: 'settingsPanel',
-	    	layout: 'fit',
-	    	height: 125,
+	    	layout: 'vbox',
+	    	height: 100,
 	    	border: 0,
 	    	padding: 10,
 			style: {
 				border  : '1px solid #99BCE8'
-			}
+			},
+			defaults: {
+				width: 300,
+				labelWidth: 75
+			},
+			items: [{
+				xtype      : 'rallyiterationcombobox',
+				fieldLabel : 'Min Iteration:',
+				id         : 'minIter',
+				listeners  : {
+					ready  : function() {
+						var me = this;
+						Ext.onReady(function() {
+							var items = App.down('#minIter').store.data.items;
+							for (i in items) {
+					    		if (me.getValue() == items[i].data._ref) {
+					    			(i < items.length - 4) ? me.setValue(items[parseInt(i) + 4].data._ref) : me.setValue(items[parseInt(items.length - 1)]); return;
+					    		}
+					    	}
+						});
+					}
+				}
+			},{
+				xtype      : 'rallyiterationcombobox',
+				fieldLabel : 'Max Iteration:',
+				id         : 'maxIter'
+			},{
+				xtype      : 'spinnerfield',
+				fieldLabel : 'Planning Period:',
+				id         : 'planPeriod',
+				value      : '2 Days',
+				width      : 261,
+				labelWidth : 91,
+				onSpinUp: function() {
+			        var val = parseInt(this.getValue().split(' ')[0]) + 1;
+			        if (val <= 10) this.setValue(val + ' Days');
+			        else Ext.Msg.alert('Error', 'Maximum planning period length is 10 days.')
+			    },
+			    onSpinDown: function() {
+			        var val = parseInt(this.getValue().split(' ')[0]) - 1;
+			        if (val >= 0) this.setValue(val + ' Days');
+			        else Ext.Msg.alert('Error', 'Planning period length must be positive.')
+			    }
+			},{
+				xtype          : 'combo',
+				id             : 'view_selection',
+				fieldLabel     : 'View',
+				width          : 261,
+				labelWidth     : 91,
+				editable       : false,
+				forceSelection : true,
+				queryMode      : 'local',
+				displayField   : 'text',
+				valueField     : 'text',
+				value          : 'Grid',
+				store          : {
+                    fields: ['text'],
+                    data: [
+                    	{ text: 'Grid'  },
+                    	{ text: 'Chart' }
+                    ]
+                },
+                hidden: true
+            }]
 		}]
 	},{
 		id          : 'viewport',
@@ -83,7 +146,6 @@ Ext.define('CustomApp', {
     launch: function() {
     	App = this;
     	App.projectTree.init();
-    	App.settingsPanel.init();
     },
 
     projectTree: {
@@ -163,63 +225,6 @@ Ext.define('CustomApp', {
     		});
     		return OIDs;
     	}
-    },
-
-    settingsPanel: {
-		init: function() {
-			App.down('#settingsPanel').add({
-				border: 0,
-				defaults: {
-					width: 300,
-					labelWidth: 75
-				},
-				items: [{
-					xtype      : 'rallyiterationcombobox',
-					fieldLabel : 'Min Iteration:',
-					id         : 'minIter'
-				},{
-					xtype      : 'rallyiterationcombobox',
-					fieldLabel : 'Max Iteration:',
-					id         : 'maxIter'
-				},{
-					xtype      : 'spinnerfield',
-					fieldLabel : 'Planning Period:',
-					id         : 'planPeriod',
-					value      : '2 Days',
-					width      : 261,
-					labelWidth : 91,
-					onSpinUp: function() {
-				        var val = parseInt(this.getValue().split(' ')[0]) + 1;
-				        if (val <= 10) this.setValue(val + ' Days');
-				        else Ext.Msg.alert('Error', 'Maximum planning period length is 10 days.')
-				    },
-				    onSpinDown: function() {
-				        var val = parseInt(this.getValue().split(' ')[0]) - 1;
-				        if (val >= 0) this.setValue(val + ' Days');
-				        else Ext.Msg.alert('Error', 'Planning period length must be positive.')
-				    }
-				},{
-					xtype          : 'combo',
-					id             : 'view_selection',
-					fieldLabel     : 'View',
-					width          : 261,
-					labelWidth     : 91,
-					editable       : false,
-					forceSelection : true,
-					queryMode      : 'local',
-					displayField   : 'text',
-					valueField     : 'text',
-					value          : 'Grid',
-					store          : {
-                        fields: ['text'],
-                        data: [
-                        	{ text: 'Grid'  },
-                        	{ text: 'Chart' }
-                        ]
-                    }
-                }]
-			});
-		}
     },
 
     viewport: {
@@ -375,10 +380,11 @@ Ext.define('CustomApp', {
     			App.down('#viewport').add({
 					xtype: 'rallygrid',
 					disableSelection: true,
+					showPagingToolbar: false,
 					store: Ext.create('Rally.data.custom.Store', {
 						data     : nodes,
 						fields   : fields.concat('Team'),
-						pageSize : 100
+						pageSize : 1000
 					}),
 					columnCfgs: columns
 				});
