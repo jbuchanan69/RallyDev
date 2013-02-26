@@ -1,5 +1,5 @@
 {
-    "name": "RPM_HM_v2.0",
+    "name": "RPM_HM",
     "className": "CustomApp",
     "sdk": "2.0p5",
     "javascript": [

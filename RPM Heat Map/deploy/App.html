@@ -2,13 +2,13 @@
 <meta charset="UTF-8">
 <html>
 <head>
-		<title>RPM_HM_v2.0</title>
+		<title>RPM_HM</title>
 
 		<script type="text/javascript" src="/apps/2.0p5/sdk.js"></script>
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // RPM Heat Map - Version 2.2
+            // RPM Heat Map - Version 2.3
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -34,7 +34,7 @@
             					autoShow  : true,
             					closable  : true,
             					draggable : true,
-            					width     : 290,
+            					width     : 300,
             					title     : 'RPM Heat Map - Help',
             					items     : {
             						xtype: 'component',
@@ -110,6 +110,12 @@
             		App = this;
             		App.usStore = {};
             		App.rpmTree.init();
+            		App.down('#viewport').addListener('resize', function() {
+            			if (App.popup) {
+            				App.popup.setWidth(Ext.getBody().getWidth());
+            				App.popup.setHeight(Ext.getBody().getHeight());
+            			}
+            		});
             	},
             
             	rpmTree: {
@@ -324,15 +330,15 @@
             								// Mark stories in the initial scope but not in the final scope as red
             								Ext.Array.each(gridObj[p].InitialStories, function(s) {
             									switch (cmpFn(s, gridObj[p].FinalStories)) {
-            										case -1 : s.Color = 2; break;
-            										case 0  : s.Color = 1; break;
+            										case -1 : s.Color = 1; break;
+            										case 0  : s.Color = 2; break;
             									}
             								});
             								// // Mark stories in the final scope but not in the initial scope as green
             								Ext.Array.each(gridObj[p].FinalStories, function(s) {
             									switch (cmpFn(s, gridObj[p].InitialStories)) {
             										case -1 : s.Color = 0; break;
-            										case 0  : s.Color = 1; break;
+            										case 0  : s.Color = 2; break;
             									}
             								});
             								gridArray.push(gridObj[p]);
@@ -348,16 +354,15 @@
             								}
             								return -1;                                                           // Item not in other store
             							}
-            
             						});
             					});
             				});
-            			
+            
             				function getDataOn(date, idx, callback) {
             					Ext.create('Rally.data.lookback.SnapshotStore', {
             						autoLoad: true,
             						pageSize: 1000000,
-            						fetch: ['_UnformattedID','Blocked','Defects','Name','ObjectID','Project','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
+            						fetch: ['_UnformattedID','Blocked','BlockedReason','CreationDate','Defects','Name','ObjectID','Project','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
             						hydrate: ['ScheduleState'],
             						filters: [
             							{ property: '_ItemHierarchy', operator: 'in', value: rpmOIDs                   }, // Descends from selected RPM level
@@ -383,7 +388,10 @@
             											BlockCount         : 0,
             											Color              : 0,
             											InitialStories     : [],
-            											FinalStories       : []
+            											FinalStories       : [],
+            											BlockedStories     : [],
+            											Defects            : [],
+            											DefectOIDs         : []
             										};
             									}
             									if (idx == 0) { // Querying for data at beginning of the sprint
@@ -396,8 +404,32 @@
             										gridObj[s.raw.Project].TaskRemTotal += s.raw.TaskRemainingTotal || 0;
             										gridObj[s.raw.Project].TaskActTotal += s.raw.TaskActualTotal    || 0;
             										s.raw.Color = -1; gridObj[s.raw.Project].FinalStories.push(s.raw);
-            										if (s.raw.Blocked) gridObj[s.raw.Project].BlockCount++;
-            										if (s.raw.Defects && s.raw.Defects.length) gridObj[s.raw.Project].DefectCount += s.raw.Defects.length;
+            										if (s.raw.Blocked) {
+            											gridObj[s.raw.Project].BlockCount++;
+            											gridObj[s.raw.Project].BlockedStories.push(s.raw);
+            										}
+            										if (s.raw.Defects && s.raw.Defects.length) {
+            											// gridObj[s.raw.Project].DefectCount += s.raw.Defects.length;
+            											Ext.create('Rally.data.lookback.SnapshotStore', {
+            												autoLoad: true,
+            												fetch: ['_UnformattedID','Name','State','Priority','Severity'],
+            												hydrate: ['State','Priority','Severity'],
+            												filters: [
+            													{ property: '__At',                           value: 'current'     },
+            													{ property: '_TypeHierarchy',                 value: 'Defect'      },
+            													{ property: 'ObjectID',       operator: 'in', value: s.raw.Defects }
+            												],
+            												listeners: {
+            													load: function(store, data) {
+            														Ext.Array.each(data, function(d) {
+            															if (d.raw.State != 'Closed') gridObj[s.raw.Project].DefectCount++;
+            															gridObj[s.raw.Project].Defects.push(d.raw);
+            														});
+            														if (gridObj[s.raw.Project].DefectCount == 0) gridObj[s.raw.Project].DefectCount = -1;
+            													}
+            												}
+            											});
+            										}
             										if (s.raw.ScheduleState == 'Accepted') {
             											gridObj[s.raw.Project].AcceptedStoryCount++;
             											gridObj[s.raw.Project].AcceptedPoints += s.raw.PlanEstimate || 0;
@@ -446,8 +478,8 @@
             						disableSelection: true,
             						showPagingToolbar: false,
             						features: [{
-            					        ftype: 'summary'
-            					    }],
+            							ftype: 'summary'
+            						}],
             						store : Ext.create('Rally.data.custom.Store', {
             							data     : gridArray,
             							sorters  : [
@@ -516,7 +548,7 @@
             							width     : 65,
             							align     : 'center',
             							renderer  : function(val, meta, record) {
-            								return '<div class="' + getColorFromVal(val, [0,0], [1,1], [2,1000], record) + ' label half">' + val + '</div>';
+            								return '<div class="' + getColorFromVal(((val < 0) ? 0 : val), [0,0], [1,1], [2,1000], record) + ' label half">' + ((val < 0) ? '&bull; 0 &bull;' : val) + '</div>';
             							}
             						},{
             							text      : 'Scope Change',
@@ -528,85 +560,177 @@
             							}
             						}],
             						listeners: {
-            	                        itemclick: function(view, record, item, index, evt) {
-            	                        	var column = view.getPositionByEvent(evt).column;
-            								if (column == 8) {
+            							itemclick: function(view, record, item, index, evt) {
+            								var column = view.getPositionByEvent(evt).column;
+            								if (column == 6) { //Blocks Report
+            									if (record.get('BlockedStories').length == 0) return;
+            									//Get Blocked Dates for each blocked User Story
+            									Ext.getBody().mask('Loading...');
+            									var remaining = record.get('BlockedStories').length;
+            									Ext.Array.each(record.get('BlockedStories'), function(s) {
+            										getBlockedDate(s, function(blocked_date) {
+            											s.BlockedDate = blocked_date;
+            											if (!--remaining) {
+            												Ext.getBody().unmask();
+            												App.popup = Ext.create('Rally.ui.dialog.Dialog', {
+            													autoShow    : true,
+            													width       : Ext.getBody().getWidth(),
+            													height      : Ext.getBody().getHeight(),
+            													autoScroll  : true,
+            													closable    : true,
+            													title       : record.get('Team') + ' - Blocked Stories',
+            													items: [{
+            														xtype             : 'rallygrid',
+            														layout            : 'fit',
+            														showPagingToolbar : false,
+            														disableSelection  : true,
+            														columnCfgs        : [
+            															{ text: 'ID',             dataIndex: '_UnformattedID', width: 60, renderer: function(val) { return 'US' + val; } },
+            															{ text: 'Name',           dataIndex: 'Name',           flex: 1                                                   },
+            															{ text: 'Blocked Reason', dataIndex: 'BlockedReason',  flex: 1                                                   },
+            															{ text: 'Blocked Date',   dataIndex: 'BlockedDate',    width: 80                                                 }
+            														],
+            														store : Ext.create('Rally.data.custom.Store', {
+            															data     : record.get('BlockedStories'),
+            															fields   : ['_UnformattedID','Name','BlockedReason','BlockedDate'],
+            															sorters  : [ { property: '_UnformattedID', direction: 'ASC' } ],
+            															pageSize : 1000
+            														})
+            													}],
+            													listeners: {
+            														afterrender: function() {
+            															this.toFront();
+            															this.focus();
+            														}
+            													}
+            												});
+            											}
+            										});
+            									});
+            								} else if (column == 7) { // Defects Report
+            									if (record.get('Defects').length == 0) return;
+            									App.popup = Ext.create('Rally.ui.dialog.Dialog', {
+            										autoShow    : true,
+            										width       : Ext.getBody().getWidth(),
+            										height      : Ext.getBody().getHeight(),
+            										autoScroll  : true,
+            										closable    : true,
+            										title       : record.get('Team') + ' - Defects',
+            										items: [{
+            											xtype             : 'rallygrid',
+            											layout            : 'fit',
+            											showPagingToolbar : false,
+            											disableSelection  : true,
+            											columnCfgs        : [
+            												{ text: 'ID',       dataIndex: '_UnformattedID', width: 60, renderer: function(val) { return 'DE' + val; } },
+            												{ text: 'Name',     dataIndex: 'Name',           flex: 1                                                   },
+            												{ text: 'State',    dataIndex: 'State',          width: 125, align: 'center'                               },
+            												{ text: 'Priority', dataIndex: 'Priority',       width: 125, align: 'center'                               },
+            												{ text: 'Severity', dataIndex: 'Severity',       width: 125, align: 'center'                               }
+            											],
+            											store : Ext.create('Rally.data.custom.Store', {
+            												data     : record.get('Defects'),
+            												fields   : ['_UnformattedID','Name','State','Priority','Severity'],
+            												sorters  : [ { property: '_UnformattedID', direction: 'ASC' } ],
+            												pageSize : 1000
+            											})
+            										}],
+            										listeners: {
+            											afterrender: function() {
+            												this.toFront();
+            												this.focus();
+            											}
+            										}
+            									});
+            								} else if (column == 8) { // Scope Change Report
             									var initialScopeDate = (Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2) < new Date()) ? Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2) : new Date();
             									var finalScopeDate   = (new Date(App.down('#iterPicker').getRecord().get('EndDate')) < new Date()) ? new Date(App.down('#iterPicker').getRecord().get('EndDate')) : new Date();
-            	                                this.popup = Ext.create('Rally.ui.dialog.Dialog', {
-            										id         : 'popup',
-            										width      : 1200,
-            										height     : 450,
-            										autoScroll : true,
-            										closable   : true,
-            										draggable  : true,
-            										layout     : {
-            	                                        align : 'stretch',
-            	                                        type  : 'hbox'
-            	                                    },
+            									App.popup = Ext.create('Rally.ui.dialog.Dialog', {
+            										autoShow    : true,
+            										width       : Ext.getBody().getWidth(),
+            										height      : Ext.getBody().getHeight(),
+            										autoScroll  : true,
+            										closable    : true,
+            										layout      : {
+            											align : 'stretch',
+            											type  : 'hbox'
+            										},
             										title    : '<div class="titleBar"><div>' + record.get('Team') + ' - Scope Change Report</div><div class="left">Initial Scope: ' + Rally.util.DateTime.toIsoString(initialScopeDate).substring(0, 10) + '</div><div class="right">Final Scope: ' + Rally.util.DateTime.toIsoString(finalScopeDate).substring(0, 10) + '</div></div>',
-            										autoShow : true,
             										defaults : {
-            											xtype             : 'rallygrid',
-            											width             : 597,
+            											xtype  : 'rallygrid',
+            											width  : '49.9%',
             											style             : { border : '1px solid #99BCE8' },
             											showPagingToolbar : false,
             											disableSelection  : true,
-            											columnCfgs        : [{
-            												text      : '',
-            												dataIndex : 'Color',
-            												width     : 25,
-            												renderer  : function(val) {
-            													return (val >= 0) ? '<div class="' + ['green','yellow','red'][val] + ' label square">' + ['+','C','-'][val] + '</div>' : '';
-            												}
-            											},{
-            												text      : 'ID',
-            												dataIndex : '_UnformattedID', 
-            												width     : 60,
-            												renderer  : function(val) {
-            	                                        		return 'US' + val;
-            	                                        	}
-            	                                        },{
-            												text      : 'Name',
-            												dataIndex : 'Name',
-            												flex      : 1
-            	                                        },{
-            												text      : 'Plan Estimate',
-            												dataIndex : 'PlanEstimate',
-            												width     : 60,
-            												align     : 'center'
-            	                                        },{
-            												text      : 'State',
-            												dataIndex : 'ScheduleState',
-            												width     : 75,
-            												align     : 'center'
-            	                                        }]
-            	                                    },
-            	                                    items: [{
-            	                                        store : Ext.create('Rally.data.custom.Store', {
+            											columnCfgs        : [
+            												{ text: '',              dataIndex: 'Color',          width: 25, renderer: function(val) { return (val >= 0) ? '<div class="' + ['green','red','yellow'][val] + ' label square">' + ['+','-','C'][val] + '</div>' : ''; } },
+            												{ text: 'ID',            dataIndex: '_UnformattedID', width: 60, renderer: function(val) { return 'US' + val;                                                                                                           } },
+            												{ text: 'Name',          dataIndex: 'Name',           flex: 1                                                                                                                                                             },
+            												{ text: 'Plan Estimate', dataIndex: 'PlanEstimate',   width: 60, align: 'center'                                                                                                                                          },
+            												{ text: 'State',         dataIndex: 'ScheduleState',  width: 90, align: 'center'                                                                                                                                          }
+            											]
+            										},
+            										items: [{
+            											store : Ext.create('Rally.data.custom.Store', {
             												data     : record.get('InitialStories'),
+            												fields   : ['Color','_UnformattedID','Name','PlanEstimate','ScheduleState'],
             												sorters  : [
             													{ property: 'Color',          direction: 'DESC' },
             													{ property: '_UnformattedID', direction: 'ASC'  }
             												],
             												pageSize : 1000
-            	                                        })
-            	                                    },{
+            											})
+            										},{
             											xtype : 'container',
-            											width : 4,
+            											width : '.1%',
             											cls   : 'split'
-            	                                    },{
-            	                                    	store : Ext.create('Rally.data.custom.Store', {
+            										},{
+            											store : Ext.create('Rally.data.custom.Store', {
             												data     : record.get('FinalStories'),
             												sorters  : [
             													{ property: 'Color',          direction: 'DESC' },
             													{ property: '_UnformattedID', direction: 'ASC'  }
             												],
             												pageSize : 1000
-            	                                        })
-            	                                    }]
-            	                                });
+            											})
+            										}],
+            										listeners: {
+            											afterrender: function() {
+            												this.toFront();
+            												this.focus();
+            											}
+            										}
+            									});
             								}
+            
+            								function getBlockedDate(s, callback) {
+            									var blocked_date = s.CreationDate.substring(0,10);
+            									Ext.create('Rally.data.WsapiDataStore', {
+            										model: 'UserStory',
+            										autoLoad: true,
+            										fetch: ['RevisionHistory','Revisions'],
+            										filters: [{
+            											property: 'ObjectID', value: s.ObjectID
+            										}],    
+            										listeners: {
+            											load: function(store, data) {
+            												var endTime = parseInt(Date.parse(App.down('#iterPicker').getRecord().get('EndDate')));
+            												if (data[0] && data[0].get('RevisionHistory') && data[0].get('RevisionHistory').Revisions) {
+            													Ext.Array.each(data[0].get('RevisionHistory').Revisions, function(r) {
+            														if (r.Description.match(/BLOCKED changed from \[false\] to \[true\]/) && parseInt(Date.parse(Rally.util.DateTime.fromIsoString(r.CreationDate))) < endTime) {
+            															blocked_date = r.CreationDate.substring(0,10);
+            														}
+            													});
+            													callback(blocked_date);
+            												} else {
+            													callback(blocked_date);
+            												}
+            											}
+            										} 
+            									});
+            								}
+            
+            
             							}
             						}
             					});
@@ -626,7 +750,7 @@
             
             });
 						Rally.launchApp('CustomApp', {
-								name: 'RPM_HM_v2.0'
+								name: 'RPM_HM'
 						});
         });
 		</script>
@@ -694,7 +818,6 @@
         	font-size   : 12px;
         	line-height : 15px;
         	font-style  : italic;
-        	color       : #C6C6C6;
         }
         
         .green     { background    : #C6EFCE; }
