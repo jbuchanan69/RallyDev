@@ -8,7 +8,7 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // ERB Dashboard - Version 2.0
+            // ERB Dashboard - Version 2.1
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -31,8 +31,8 @@
                         var currWeek,
                             weeks = [],
                             aDate = new Date(new Date().getFullYear(), 0, 1); // First day of the year
-                        while (aDate.getDay() != 0) {
-                            aDate.setDate(aDate.getDate() + 1); // Add one day until aligned with a Sunday
+                        while (aDate.getDay() != 1) {
+                            aDate.setDate(aDate.getDate() - 1); // Add one day until aligned with a Sunday
                         }
                         do {
                             weeks.push({
@@ -68,6 +68,14 @@
                             }
                         });
                     });
+            
+                    App.down('#viewport').addListener('resize', function() {
+                        if (App.popup) {
+                            App.popup.setWidth(Ext.getBody().getWidth());
+                            App.popup.setHeight(Ext.getBody().getHeight());
+                        }
+                    });
+            
             	},
             
                 Viewport: {
@@ -147,6 +155,7 @@
                                                 x.raw.ProjectName = (x.raw.Project) ? x.raw.Project._refObjectName : '';
                                                 x.raw.OwnerName   = (x.raw.Owner)   ? x.raw.Owner._refObjectName   : '';
                                                 if (data_type === 'UserStory') {
+                                                    x.raw.State = x.raw.ScheduleState;
                                                     gridData[x.raw.Release._refObjectName].UserStories.push(x.raw);
                                                 } else if (data_type === 'Defect') {
                                                     x.raw.ParentText = '';
@@ -164,7 +173,8 @@
                                                     t.ParentText  = '<b>' + x.raw.FormattedID + ': </b>' + x.raw._refObjectName;
                                                     gridData[x.raw.Release._refObjectName].TestCases.push(t);
                                                 });
-                                                if (x.raw.Release.Notes) gridData[x.raw.Release._refObjectName].Notes.push('<b>' + x.raw.Project._refObjectName + '</b>: ' + Rally.util.String.stripHTML(x.raw.Release.Notes));
+                                                if (x.raw.Release.Notes && Ext.Array.indexOf(gridData[x.raw.Release._refObjectName].Notes, '<b>' + x.raw.Project._refObjectName + '</b>: ' + Rally.util.String.stripHTML(x.raw.Release.Notes)) == -1)
+                                                    gridData[x.raw.Release._refObjectName].Notes.push('<b>' + x.raw.Project._refObjectName + '</b>: ' + Rally.util.String.stripHTML(x.raw.Release.Notes));
                                             });
                                             loader.nextPage();
                                         } else {
@@ -246,27 +256,33 @@
                                     itemclick: function(view, record, item, index, evt) {
                                         var column = view.getPositionByEvent(evt).column;
                                         if (column == 2) {
-                                            showPopup('User Stories','US_Store',[
-                                                { text: 'ID',            dataIndex: 'FormattedID',   width: 60  },
+                                            showPopup('User Stories',record.get('US_Store').concat(record.get('DE_Store')),[
+                                                { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/' + ((val.match(/US/)) ? 'userstory' : 'defect') + '/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                                 { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                                 { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                                 { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
-                                                { text: 'State',         dataIndex: 'ScheduleState', width: 75  },
+                                                { text: 'Severity',      dataIndex: 'Severity',      width: 100 },
+                                                { text: 'State',         dataIndex: 'State',         width: 75  },
                                                 { text: 'Technical SME', dataIndex: 'TechnicalSME',  width: 100 },
                                                 { text: 'Business SME',  dataIndex: 'BusinessSME',   width: 100 }
                                             ]);
                                         } else if (column == 3 || column == 4) { //Defects
-                                            showPopup('Defects','DE_Store',[
-                                                { text: 'ID',            dataIndex: 'FormattedID',   width: 60  },
+                                            if ((column == 3 && record.get('DE_Crit_Count') == 0) ||
+                                                (column == 4 && record.get('DE_High_Count') == 0)) return;
+                                            showPopup('Defects',record.get('DE_Store'),[
+                                                { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/defect/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                                 { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                                 { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                                 { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
                                                 { text: 'State',         dataIndex: 'State',         width: 75  },
                                                 { text: 'Work Product',  dataIndex: 'ParentText',    flex: 1    }
-                                            ]);
+                                            ],[{
+                                                property : 'Severity',
+                                                value    : (column == 3) ? 'Critical' : 'High'
+                                            }]);
                                         } else if (column == 5) {
-                                            showPopup('Test Cases','TC_Store',[
-                                                { text: 'ID',            dataIndex: 'FormattedID',   width: 60  },
+                                            showPopup('Test Cases',record.get('TC_Store'),[
+                                                { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/testcase/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                                 { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                                 { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                                 { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
@@ -275,28 +291,26 @@
                                             ]);
                                         }
             
-                                        function showPopup(title, store, columns) {
-                                            if (record.get(store).length == 0) return;
-                                            Ext.create('Rally.ui.dialog.Dialog', {
+                                        function showPopup(title, data, columns, supFilter) {
+                                            if (data.length == 0) return;
+                                            
+                                            App.popup = Ext.create('Rally.ui.dialog.Dialog', {
                                                 id         : 'popup',
-                                                width      : 1100,
-                                                height     : 450,
+                                                width      : Ext.getBody().getWidth(),
+                                                height     : Ext.getBody().getHeight(),
                                                 autoScroll : true,
                                                 closable   : true,
-                                                draggable  : true,
                                                 title      : record.get('Bundle') + ' - ' + title,
                                                 autoShow   : true,
-                                                layout     : {
-                                                    align : 'stretch',
-                                                    type  : 'hbox'
-                                                },
                                                 items: [{
                                                     xtype             : 'rallygrid',
-                                                    width             : 1098,
+                                                    layout            : 'fit',
                                                     showPagingToolbar : false,
                                                     disableSelection  : true,
                                                     store : Ext.create('Rally.data.custom.Store', {
-                                                        data     : record.get(store),
+                                                        data     : data,
+                                                        fields   : ['FormattedID','Name','ObjectID','ProjectName','OwnerName','Severity','ScheduleState','TechnicalSME','BusinessSME','State','ParentText','LastVerdict'],
+                                                        filters  : supFilter,
                                                         sorters  : [{
                                                             property  : 'FormattedID',
                                                             direction : 'ASC'
@@ -304,8 +318,15 @@
                                                         pageSize : 1000
                                                     }),
                                                     columnCfgs : columns
-                                                }]
+                                                }],
+                                                listeners: {
+                                                    afterrender: function() {
+                                                        this.toFront();
+                                                        this.focus();
+                                                    }
+                                                }
                                             });
+            
                                         }
                                     }
                                 }
