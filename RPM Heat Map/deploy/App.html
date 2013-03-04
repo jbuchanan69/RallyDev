@@ -8,7 +8,7 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // RPM Heat Map - Version 2.3.1
+            // RPM Heat Map - Version 2.3.2
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -87,7 +87,7 @@
             				listeners  : {
             					change : function() {
             						Ext.onReady(function() {
-            							if (App.rpmTree.getSelectedRPMNodes().length != 0) App.viewport.update();
+            							if (App.down('#rpmTree').getSelectionModel().getSelection().length > 0) App.viewport.update();
             						});
             					}
             				}
@@ -215,13 +215,6 @@
             				});
             				
             			}
-            		},
-            		getSelectedRPMNodes: function() {
-            			var OIDs = [];
-            			Ext.Array.each(App.down('#rpmTree').getSelectionModel().getSelection(), function(node) {
-            				OIDs.push(node.data.id);
-            			});
-            			return OIDs;
             		}
             	},
             
@@ -250,13 +243,12 @@
             
             	viewport: {
             		update: function() {
+            			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) return; //Nothing to render
             			var gridObj   = {};
             			var gridArray = [];
             			Ext.getBody().mask('Loading...');
             			App.down('#viewport').removeAll();
-            			if (App.rpmTree.getSelectedRPMNodes().length == 0) return; //Nothing to render
             			App.iterPicker.getIterOIDs(function(iterOIDs) {
-            				var rpmOIDs = App.rpmTree.getSelectedRPMNodes();
             				getDataOn(Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2)), 0, function() {
             					getDataOn(Rally.util.DateTime.toIsoString(new Date(App.down('#iterPicker').getRecord().get('EndDate'))), 1, function() {
             						getProjectNames(function() {
@@ -316,11 +308,11 @@
             						fetch: ['_UnformattedID','Blocked','BlockedReason','CreationDate','Defects','Name','ObjectID','Project','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
             						hydrate: ['ScheduleState'],
             						filters: [
-            							{ property: '_ItemHierarchy', operator: 'in', value: rpmOIDs                   }, // Descends from selected RPM level
-            							{ property: 'Iteration',      operator: 'in', value: iterOIDs                  }, // Only pull stories in the selected iteration
-            							{ property: 'Children',                       value: null                      }, // Leaf stories only
-            							{ property: '__At',                           value: date                      }, // Look back to selected date
-            							{ property: '_TypeHierarchy',                 value: 'HierarchicalRequirement' }  // Only pull User Stories
+            							{ property: '_ItemHierarchy', operator: 'in', value: App.down('#rpmTree').getSelectionModel().getSelection()[0].data.id }, // Descends from selected RPM level
+            							{ property: 'Iteration',      operator: 'in', value: iterOIDs                                                           }, // Only pull stories in the selected iteration
+            							{ property: 'Children',                       value: null                                                               }, // Leaf stories only
+            							{ property: '__At',                           value: date                                                               }, // Look back to selected date
+            							{ property: '_TypeHierarchy',                 value: 'HierarchicalRequirement'                                          }  // Only pull User Stories
             						],
             						listeners: {
             							load: function(model, data, success) {
@@ -360,7 +352,6 @@
             											gridObj[s.raw.Project].BlockedStories.push(s.raw);
             										}
             										if (s.raw.Defects && s.raw.Defects.length) {
-            											// gridObj[s.raw.Project].DefectCount += s.raw.Defects.length;
             											Ext.create('Rally.data.lookback.SnapshotStore', {
             												autoLoad: true,
             												fetch: ['_UnformattedID','Name','State','Priority','Severity'],
