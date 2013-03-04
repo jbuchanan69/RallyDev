@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 2.3
+// RPM Heat Map - Version 2.3.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -220,10 +220,11 @@ Ext.define('CustomApp', {
 								pageSize: 1000000,
 								fetch: ['ObjectID'],
 								filters: [
-									{ property: '_ItemHierarchy', value: OID                       },
-									{ property: 'Children',       value: null                      },
-									{ property: '__At',           value: 'current'                 },
-									{ property: '_TypeHierarchy', value: 'HierarchicalRequirement' }
+									{ property: '_ProjectHierarchy', value: App.getContext().getProject().ObjectID },
+									{ property: '_ItemHierarchy',    value: OID                                    },
+									{ property: 'Children',          value: null                                   },
+									{ property: '__At',              value: 'current'                              },
+									{ property: '_TypeHierarchy',    value: 'HierarchicalRequirement'              }
 								],
 								listeners: {
 									load: function(model, data, success) {
@@ -234,6 +235,7 @@ Ext.define('CustomApp', {
 											});
 											callback(Ext.Array.unique(descendants));
 										} else {
+											if (!success) console.log(OID);
 											callback([]);
 										}
 									}
@@ -243,16 +245,6 @@ Ext.define('CustomApp', {
 					}
 				}
 			});
-		},
-
-		getAllDescendants: function() {
-			var descendants = [];
-			Ext.Array.each(App.down('#rpmTree').getSelectionModel().getSelection(), function(node) {
-				Ext.Array.each(node.raw.descendants, function(descendant) {
-					descendants.push(descendant);
-				});
-			});
-			return Ext.Array.unique(descendants);
 		},
 
 		getSelectedRPMNodes: function() {
@@ -310,13 +302,13 @@ Ext.define('CustomApp', {
 								if (gridObj[p].AcceptedByCount       <   1  ||
 									gridObj[p].AcceptedByPoints      <   1  ||
 									Math.abs(gridObj[p].ScopeChange) >= .1  ||
-									gridObj[p].Defects               >   0  ||
-									gridObj[p].Blocks                >   0) gridObj[p].Color = 1; //Yellow
+									gridObj[p].DefectCount           >   0  ||
+									gridObj[p].BlockCount            >   0) gridObj[p].Color = 1; //Yellow
 								if (gridObj[p].AcceptedByCount       <= .5  ||
 									gridObj[p].AcceptedByPoints      <= .5  ||
 									Math.abs(gridObj[p].ScopeChange) >= .25 ||
-									gridObj[p].Defects               >   1  ||
-									gridObj[p].Blocks                >   1) gridObj[p].Color = 2; //Red
+									gridObj[p].DefectCount           >   1  ||
+									gridObj[p].BlockCount            >   1) gridObj[p].Color = 2; //Red
 								// Mark stories in the initial scope but not in the final scope as red
 								Ext.Array.each(gridObj[p].InitialStories, function(s) {
 									switch (cmpFn(s, gridObj[p].FinalStories)) {
