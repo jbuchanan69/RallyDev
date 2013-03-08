@@ -1,0 +1,18 @@
+.icon {
+	border        : 1px solid #C6C6C6;
+	border-radius : 3px;
+	text-align    : center;
+	margin        : 0 auto 4px auto;
+	width         : 195px;
+	height        : 20px;
+	line-height   : 20px;
+	float         : right;
+}
+
+.releaseName, .releaseDate {
+	display: inline-block;
+}
+.releaseDate {
+	float: right;
+	font-weight: bold;
+}
