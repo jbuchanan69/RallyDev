@@ -1,0 +1,12 @@
+.label {
+	padding: 2px 0;
+	border-radius: 3px;
+}
+.half {
+	width: 39px;
+	text-align: center;
+	display: inline-block;
+}
+.green  { background: #C6EFCE; }
+.red    { background: #FFC7CE; }
+.yellow { background: #FFEB9C; }
