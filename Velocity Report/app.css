@@ -1,0 +1,14 @@
+.app {
+	text-align: center;
+	padding: 5px;
+}
+
+.pan {
+	margin: 2px;
+	display: inline-block;
+}
+
+.filter {
+	display: inline-block;
+	margin: 3px;
+}
