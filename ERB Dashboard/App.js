@@ -1,4 +1,4 @@
-// ERB Dashboard - Version 2.1
+// ERB Dashboard - Version 2.2
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -6,67 +6,107 @@ Ext.define('CustomApp', {
 	componentCls: 'app',
 
     items:[{
-        xtype : 'container',
-        id    : 'toolbar'
+        xtype  : 'container',
+        id     : 'toolbar',
+        layout : 'hbox'
     },{
-        xtype : 'container',
-        id    : 'viewport'
+        xtype  : 'container',
+        id     : 'viewport'
     }],
 
 	launch: function() {
         App = this;
-        //Initialize the week picker combo box
-        Ext.onReady(function() {
-            // Starting with the first Sunday of the year, get all release weeks
-            var currWeek,
-                weeks = [],
-                aDate = new Date(new Date().getFullYear(), 0, 1); // First day of the year
-            while (aDate.getDay() != 1) {
-                aDate.setDate(aDate.getDate() - 1); // Add one day until aligned with a Sunday
-            }
-            do {
-                weeks.push({
-                    Name      : 'Week ' + Ext.Date.getWeekOfYear(aDate) + ': ' + Ext.Date.format(aDate, 'M j') + ' - ' + Ext.Date.format(Ext.Date.add(aDate, Ext.Date.DAY, 6), 'M j'),
-                    DateRange : {
-                        StartDate : Rally.util.DateTime.toIsoString(aDate),
-                        EndDate   : Rally.util.DateTime.toIsoString(Ext.Date.add(aDate, Ext.Date.MILLI, 604799999))
-                    }
-                });
-                if (Ext.Date.format(aDate, 'U') <= (Ext.Date.now() / 1000)) currWeek = weeks[weeks.length - 1].DateRange;
-                aDate.setDate(aDate.getDate() + 7); // Add one week
-            } while (Ext.Date.getWeekOfYear(aDate) != 1);
-            // Using the collected week information, add a combobox picker to the UI
-            App.down('#toolbar').add({
-                xtype          : 'combo',
-                id             : 'weekPicker',
-                fieldLabel     : 'Release Week',
-                labelWidth     : 75,
-                width          : 250,
-                editable       : false,
-                forceSelection : true,
-                queryMode      : 'local',
-                displayField   : 'Name',
-                valueField     : 'DateRange',
-                value          : currWeek,
-                store: {
-                    fields: ['Name','DateRange'],
-                    data: weeks
-                },
-                listeners   : {
-                    change  : App.Viewport.update,
-                    added   : App.Viewport.update
-                }
-            });
-        });
-
+        App.Toolbar.init();
         App.down('#viewport').addListener('resize', function() {
             if (App.popup) {
                 App.popup.setWidth(Ext.getBody().getWidth());
                 App.popup.setHeight(Ext.getBody().getHeight());
             }
         });
-
 	},
+
+    Toolbar: {
+        init: function() {
+            App.down('#toolbar').add({
+                xtype      : 'spinnerfield',
+                fieldLabel : 'Release Week:',
+                id         : 'releaseYear',
+                value      : new Date().getFullYear(),
+                width      : 135,
+                labelWidth : 72,
+                editable   : false,
+                onSpinUp: function() {
+                    this.setValue(parseInt(this.getValue()) + 1);
+                    App.Toolbar.WeekPicker.update();
+                },
+                onSpinDown: function() {
+                    this.setValue(parseInt(this.getValue()) - 1);
+                    App.Toolbar.WeekPicker.update();
+                },
+                listeners: {
+                    added: function() {
+                        App.Toolbar.WeekPicker.add();
+                    }
+                }
+            });
+        },
+
+        WeekPicker: {
+            add: function() {
+                App.Toolbar.WeekPicker.getWeekInfo(function(weekStore, currWeek) {
+                    App.down('#toolbar').add({
+                        xtype          : 'combo',
+                        id             : 'releaseWeek',
+                        width          : 175,
+                        editable       : false,
+                        forceSelection : true,
+                        queryMode      : 'local',
+                        displayField   : 'Name',
+                        valueField     : 'DateRange',
+                        value          : currWeek,
+                        store: {
+                            fields: ['Name','DateRange'],
+                            data: weekStore
+                        },
+                        listeners   : {
+                            change  : App.Viewport.update,
+                            added   : App.Viewport.update
+                        }
+                    });
+                });
+            },
+
+            update: function() {
+                App.down('#releaseWeek').destroy();
+                App.Toolbar.WeekPicker.add();
+            },
+
+            getWeekInfo: function(callback) {
+                // Starting with the first Sunday of the year, get all release weeks
+                var currWeek,
+                    weekNumber = 1,
+                    weeks      = [],
+                    aDate      = new Date(App.down('#releaseYear').getValue(), 0, 1); // First day of the year
+                while (aDate.getDay() != 0) {
+                    aDate.setDate(aDate.getDate() - 1);
+                }
+                do {
+                    weeks.push({
+                        Name      : 'Week ' + ((weekNumber < 10) ? '0' : '') + weekNumber + ': ' + Ext.Date.format(aDate, 'M j') + ' - ' + Ext.Date.format(Ext.Date.add(aDate, Ext.Date.DAY, 6), 'M j'),
+                        DateRange : {
+                            StartDate : Rally.util.DateTime.toIsoString(aDate),
+                            EndDate   : Rally.util.DateTime.toIsoString(Ext.Date.add(aDate, Ext.Date.MILLI, 604799999))
+                        }
+                    });
+                    if (Ext.Date.format(aDate, 'U') <= (Ext.Date.now() / 1000)) currWeek = weeks[weeks.length - 1].DateRange;
+                    aDate.setDate(aDate.getDate() + 7); // Add one week
+                    weekNumber++;
+                } while (weekNumber <= 52);
+                if (currWeek == null) currWeek = weeks[0].DateRange;
+                callback(weeks, currWeek);
+            }  
+        }
+    },
 
     Viewport: {
         update: function() {
@@ -97,9 +137,12 @@ Ext.define('CustomApp', {
                         for (d in gridData[b].Defects) {
                             if (gridData[b].Defects[d].State == 'Closed') {
                                 bNode.DE_Clos_Count++;
+                            } else if (gridData[b].Defects[d].Severity == 'Critical') {
+                                bNode.DE_Crit_Count++;
+                            } else if (gridData[b].Defects[d].Severity == 'High') {
+                                bNode.DE_High_Count++;
                             } else {
-                                if (gridData[b].Defects[d].Severity == 'Critical') bNode.DE_Crit_Count++;
-                                if (gridData[b].Defects[d].Severity == 'High'    ) bNode.DE_High_Count++;
+                                bNode.DE_Clos_Count++; // Medium or cosmetic, not included in WI rate
                             }
                         }
                         for (tc in gridData[b].TestCases) {
@@ -124,9 +167,9 @@ Ext.define('CustomApp', {
                         'PlanEstimate', 'Project',     'Release',      'Severity',  'ScheduleState', 'State', 'TechnicalSME', 'BusinessSME', 'TestCases'
                     ],
                     filters: [
-                        { property: 'Release.Name',        operator: 'contains', value: 'BNDL'                                       },
-                        { property: 'Release.ReleaseDate', operator: '>=',       value: App.down('#weekPicker').getValue().StartDate },
-                        { property: 'Release.ReleaseDate', operator: '<=',       value: App.down('#weekPicker').getValue().EndDate   }
+                        { property: 'Release.Name',        operator: 'contains', value: 'BNDL'                                        },
+                        { property: 'Release.ReleaseDate', operator: '>=',       value: App.down('#releaseWeek').getValue().StartDate },
+                        { property: 'Release.ReleaseDate', operator: '<=',       value: App.down('#releaseWeek').getValue().EndDate   }
                     ],
                     listeners: {
                         load: function(store, data) {
@@ -202,7 +245,7 @@ Ext.define('CustomApp', {
                         align     : 'center',
                         resizable : false,
                         renderer  : function(val) {
-                            var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#weekPicker').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
+                            var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
                             return '<div class="' + color + ' label">' + parseInt(val * 100) + '%<div>';
                         }
                     },{
@@ -233,7 +276,7 @@ Ext.define('CustomApp', {
                             if (val == 'N/A') {
                                 return val;
                             } else {
-                                var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#weekPicker').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
+                                var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
                                 return '<div class="' + color + ' label">' + parseInt(val * 100) + '%<div>'; 
                             }
                         }
