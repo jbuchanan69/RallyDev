@@ -355,7 +355,7 @@ Ext.define('CustomApp', {
                                             dataIndex: 'Name',
                                             flex: 1
                                         },{
-                                            text: 'Plan Estimate',
+                                            text: 'Plan Estimate Points',
                                             dataIndex: 'PlanEstimate',
                                             width: 60,
                                             align: 'center'
