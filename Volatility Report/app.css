@@ -1,0 +1,59 @@
+.count {
+	width         : 25px;
+	border        : 1px solid #B7841F;
+	display       : inline-block;
+	text-align    : center;
+	font-size     : 9px;
+	height        : 13px;
+	line-height   : 12px;
+	border-radius : 3px;
+	background    : #ffff99;
+	background    : -moz-linear-gradient(top,  #ffff99 0%, #ffd46f 100%);
+	background    : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffff99), color-stop(100%,#ffd46f));
+	background    : -webkit-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : -o-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : -ms-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : linear-gradient(to bottom,  #ffff99 0%,#ffd46f 100%);
+	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
+}
+
+#iterPicker-inputCell {
+	width: 200px;
+	margin: 0 3px;
+}
+
+#viewport, #aGrid, #bGrid {
+	background: #B5D8EB;
+}
+
+#viewport {
+	border-top: 1px solid #3F84A4;
+}
+#aGrid {
+	padding-right: 2px;
+}
+#bGrid {
+	padding-left: 2px;
+}
+
+.label {
+	display       : inline-block;
+	padding       : 2px;
+	width         : 125px;
+	height        : 20px;
+	line-height   : 16px;
+	text-align    : center;
+	border-radius : 3px;
+	margin        : 0 2px 0 -4px;
+}
+
+.align {
+	display    : inline-block;
+	text-align : center;
+	width      : 60px;
+}
+
+.green     { background    : #C6EFCE; }
+.red       { background    : #FFC7CE; }
+.yellow    { background    : #FFEB9C; }
+.square    { width         : 20px;    }
