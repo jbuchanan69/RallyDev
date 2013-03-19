@@ -1,4 +1,4 @@
-// RPM Work Item Composition - Version 1.1.1
+// RPM Work Item Composition - Version 1.2
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -65,302 +65,251 @@ Ext.define('CustomApp', {
 		App.rpmTree.init();
 	},
 
-	rpmTree: {
+rpmTree: {
 		init: function() {
-			//Load RPM roots
 			Ext.create('Rally.data.WsapiDataStore', {
-				autoLoad : true,
-				model    : 'portfolioitem/initiative',
-				fetch    : [ 'Children', 'Name', 'ObjectID' ],
-				listeners: {
-					load: function(model, roots) {
-						if (roots.length == 0) {
+	            autoLoad: true,
+	            model: 'PortfolioItem/Initiative',
+	            fetch: ['Children','LeafStoryCount','Name','ObjectID'],
+	            listeners: {
+	                load: function(store, data) {
+	                    if (data.length == 0) {
 							App.removeAll();
 							Ext.getBody().unmask();
 							Ext.Msg.alert('Error', '<div class="error">This app must be ran within a context which features Initiative Portfolio Items.<br />Please change your project scope and try again.</div>');
 							return;
-						}
-						//Create tree store using roots
-						var nodes = [];
-						var childFilter = [];
-						Ext.Array.each(roots, function(root) {
-							getDescendants(root.get('ObjectID'), function(descendants) {
-								childFilter = [];
-								Ext.Array.each(root.get('Children'), function(c) {
-									childFilter.push({ property: 'ObjectID', value: c.ObjectID });
-								});
-								nodes.push({
-									name        : root.get('Name'),
-									childFilter : childFilter,
-									text        : '<span class="count">' + descendants.length + '</span> - <span class="nodeTitle">' + root.get('Name') + '</span>',
-									id          : root.get('ObjectID'),
-									leaf        : root.raw.Children == undefined || root.raw.Children.length == 0,
-									descendants : descendants
-								});
-								if (nodes.length == roots.length) {
-									nodes.sort(function(a, b) { return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0; });
-									drawTree();
-								}
+						} else {
+							var roots = [];
+							Ext.Array.each(data, function(i) {
+		                    	roots.push({
+		                    		name : i.raw.Name,
+		                    		text : '<span class="count">' + i.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + i.raw.Name + '</span>',
+		                    		id   : i.raw.ObjectID,
+		                    		leaf : i.raw.Children == undefined || i.raw.Children.length == 0
+		                    	});
+		                    });
+		                    roots.sort(function(a, b) {
+								return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
 							});
-						});
+		                    drawTree(roots);
+						}
+	                }
+	            }
+	        });
 
-						function drawTree() {
-							var newCount = 0;
-							//Add tree to UI element
-							App.down('#rpmTreeContainer').add({
-								xtype        : 'treepanel',
-								store        : Ext.create('Ext.data.TreeStore', { root: { expanded: true, children: nodes } }),
-								id           : 'rpmTree',
-								rootVisible  : false,
-								margin       : '-1 0 0 0',
-								border       : 0,
-								listeners    : {
-									beforeitemexpand: function(node) {
-										if (node.hasChildNodes() == false && node.raw.childFilter.length > 0) { //Query for children of selected node
-											var newNodes = [];
-											var childLoader = Ext.create('Rally.data.WsapiDataStore', {
-												model     : 'portfolioitem',
-												fetch     : [ 'Children', 'Name', 'ObjectID' ],
-												filters   : [ Rally.data.QueryFilter.or(node.raw.childFilter) ],
-												listeners : {
-													load  : function(model, children) {
-														newCount = children.length;
-														Ext.Array.each(children, function(child) {
-															getDescendants(child.get('ObjectID'), function(descendants) {
-																childFilter = [];
-																Ext.Array.each(child.raw.Children, function(c) {
-																	childFilter.push({ property: 'ObjectID', value: c.ObjectID });
-																});
-																newNodes.push({
-																	name        : child.get('Name'),
-																	childFilter : childFilter,
-																	text        : '<span class="count">' + descendants.length + '</span> - <span class="nodeTitle">' + child.get('Name') + '</span>',
-																	id          : child.get('ObjectID'),
-																	leaf        : child.raw.Children == undefined || child.raw.Children.length == 0,
-																	descendants : descendants
-																});
-															});
-														});
-													}
-												}
-											});
-											childLoader.loadPages({
-												callback: function() {
-													var nodeWait = setInterval(function() {
-														if (newNodes.length == newCount) {
-															Ext.Array.each(newNodes.sort(function(a, b) {
-																return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
-															}), function(n) {
-																node.appendChild(n);
-															});
-															clearInterval(nodeWait);
-														}
-													}, 50);
-												}
-											});
-										}
-									},
-									selectionchange: function() {
-										App.viewport.update();
-									},
-									added: function() {
-										Ext.getBody().unmask();
-									}
-								}
-							});
-							App.down('#popout').setWidth(250);
+			function drawTree(roots) {
+				App.down('#rpmTreeContainer').add({
+					xtype        : 'treepanel',
+					store        : Ext.create('Ext.data.TreeStore', {
+						root: {
+							expanded: true,
+							children: roots
 						}
-						
-						function getDescendants(OID, callback) {
-							Ext.create('Rally.data.lookback.SnapshotStore', {
-								autoLoad: true,
-								pageSize: 1000000,
-								fetch: ['ObjectID'],
-								filters: [
-									{ property: '_ItemHierarchy', value: OID                       },
-									{ property: 'Children',       value: null                      },
-									{ property: '__At',           value: 'current'                 },
-									{ property: '_TypeHierarchy', value: 'HierarchicalRequirement' }
-								],
-								listeners: {
-									load: function(model, data, success) {
-										if (data && data.length && success) {
-											var descendants = [];
-											Ext.Array.each(data, function(story) {
-												descendants.push(story.get('ObjectID'));
-											});
-											callback(Ext.Array.unique(descendants));
-										} else {
-											callback([]);
+					}),
+					id           : 'rpmTree',
+					rootVisible  : false,
+					margin       : '-1 0 0 0',
+					border       : 0,
+					listeners    : {
+						added    : function() {
+							App.down('#popout').setWidth(250);
+							Ext.getBody().unmask();
+						},
+						beforeitemexpand: function(node) {
+							if (node.hasChildNodes() == false) { // Child nodes have not been populated yet
+								getChildren('Rollup', function(rollup_children) {
+									getChildren('Feature', function(feature_children) {
+										var children = [];
+										Ext.Array.each(rollup_children.concat(feature_children), function(c) {
+											children.push({
+					                    		name : c.raw.Name,
+					                    		text : '<span class="count">' + c.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + c.raw.Name + '</span>',
+					                    		id   : c.raw.ObjectID,
+					                    		leaf : c.raw.Children == undefined || c.raw.Children.length == 0
+					                    	});
+										});
+										Ext.Array.each(children.sort(function(a, b) {
+											return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
+										}), function(n) {
+											node.appendChild(n);
+										});
+									});
+								});
+							}
+
+							function getChildren(child_type, callback) {
+								Ext.create('Rally.data.WsapiDataStore', {
+									autoLoad: true,
+									model: 'PortfolioItem/' + child_type,
+									filters: [{
+										property: 'Parent.ObjectID',
+										value: node.raw.id
+									}],
+									fetch: ['Children','LeafStoryCount','Name','ObjectID'],
+									listeners: {
+										load: function(store, data) {
+											callback(data);
 										}
 									}
-								}
-							});
+								});
+							}
+
+						},
+						selectionchange: function() {
+							App.viewport.update();
 						}
 					}
-				}
-			});
-		},
-
-		getAllDescendants: function() {
-			var descendants = [];
-			Ext.Array.each(App.down('#rpmTree').getSelectionModel().getSelection(), function(node) {
-				Ext.Array.each(node.raw.descendants, function(descendant) {
-					descendants.push(descendant);
 				});
-			});
-			return Ext.Array.unique(descendants);
+				
+			}
 		}
 	},
 
 	viewport: {
 		update: function() {
-			var gridObj           = {},
-				gridArray         = [],
-				selectedStoryOIDs = App.rpmTree.getAllDescendants();
+			var gridArray = [];
 			App.down('#viewport').removeAll();
-			if (App.rpmTree.getAllDescendants().length == 0) {
+			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) {
 				return; //Nothing to render
 			} else {
 				Ext.getBody().mask('Loading...');
-				var filter    = [],
-					remaining = Math.ceil(selectedStoryOIDs.length / 100);
-				Ext.Array.each(selectedStoryOIDs, function(OID, key) {
-					filter.push({
-						property : 'ObjectID',
-						value    : OID
-					});
-					if (filter.length == 100 || key == selectedStoryOIDs.length - 1) {
-						loadDetails(filter, function() {
-							if (!--remaining) {
-								//Put grid object data into array for the grid to use
-								for (p in gridObj) {
-									for (s in gridObj[p]) {
-										gridArray.push({
-											Team          : p,
-											Name          : gridObj[p][s].Name,
-											OID           : gridObj[p][s].ObjectID,
-											FID           : gridObj[p][s].FormattedID,
-											Owner         : (gridObj[p][s].Owner) ? gridObj[p][s].Owner._refObjectName : '',
-											PlanEstimate  : gridObj[p][s].PlanEstimate,
-											State         : Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], gridObj[p][s].ScheduleState),
-											TaskActual    : gridObj[p][s].TaskActualTotal,
-											TaskEstimate  : gridObj[p][s].TaskEstimateTotal,
-											TaskRemaining : gridObj[p][s].TaskRemainingTotal
-										});
-									}
-								}
-								if (gridArray.length == 0) {
-									Ext.getBody().unmask();
-									Ext.Msg.alert('Error', 'The selected query criteria returned no results.');
-									return;
-								}
-								//Render grid to page
-								Ext.getBody().unmask();
-								App.down('#viewport').add({
-									xtype             : 'rallygrid',
-									disableSelection  : true,
-									showPagingToolbar : false,
-									store: Ext.create('Rally.data.custom.Store', {
-										data       : gridArray,
-										groupField : 'Team',
-										pageSize   : 1000,
-										sorters    : [
-											{ property: 'Team',         direction: 'ASC'  },
-											{ property: 'State',        direction: 'ASC'  },
-											{ property: 'PlanEstimate', direction: 'DESC' }
-										]
-									}),
-									features: [Ext.create('Ext.grid.feature.Grouping', {
-							        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
-							   		})],
-									columnCfgs: [{
-										text      : 'ID',
-										dataIndex : 'FID',
-										width     : 60,
-										renderer  : function(val, meta, record) {
-											return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('OID') + '">' + val + '</a>';
-										}
-									},{
-										text      : 'Name',
-										dataIndex : 'Name',
-										flex      : 1,
-										minWidth  : 150
-									},{
-										text      : 'State',
-										dataIndex : 'State',
-										width     : 75,
-										align     : 'center',
-										renderer  : function(val) {
-											return ['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'][val];
-										}
-									},{
-										text      : 'Plan Estimate',
-										dataIndex : 'PlanEstimate',
-										width     : 75,
-										align     : 'center'
-									},{
-										text      : 'Owner',
-										dataIndex : 'Owner',
-										width     : 150,
-										align     : 'center'
-									},{
-										text      : 'Estimated Task Hours',
-										dataIndex : 'TaskEstimate',
-										width     : 75,
-										align     : 'center'
-									},{
-										text      : 'Actual Task Hours',
-										dataIndex : 'TaskActual',
-										width     : 75,
-										align     : 'center'
-									},{
-										text      : 'Remaining Task Hours',
-										dataIndex : 'TaskRemaining',
-										width     : 75,
-										align     : 'center'
-									}]
-								});
-							}
-						});
-						filter = [];
+				loadDetails(function() {
+					if (gridArray.length == 0) {
+						Ext.getBody().unmask();
+						Ext.Msg.alert('Error', 'The selected query criteria returned no results.');
+						return;
 					}
+					//Render grid to page
+					Ext.getBody().unmask();
+					App.down('#viewport').add({
+						xtype             : 'rallygrid',
+						disableSelection  : true,
+						showPagingToolbar : false,
+						store: Ext.create('Rally.data.custom.Store', {
+							data       : gridArray,
+							groupField : 'Team',
+							pageSize   : 1000,
+							sorters    : [
+								{ property: 'Team',         direction: 'ASC'  },
+								{ property: 'State',        direction: 'ASC'  },
+								{ property: 'PlanEstimate', direction: 'DESC' }
+							]
+						}),
+						features: [Ext.create('Ext.grid.feature.Grouping', {
+				        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
+				   		})],
+						columnCfgs: [{
+							text      : 'ID',
+							dataIndex : '_UnformattedID',
+							width     : 60,
+							renderer  : function(val, meta, record) {
+								return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('ObjectID') + '">US' + val + '</a>';
+							}
+						},{
+							text      : 'Name',
+							dataIndex : 'Name',
+							flex      : 1,
+							minWidth  : 150
+						},{
+							text      : 'State',
+							dataIndex : 'State',
+							width     : 75,
+							align     : 'center',
+							renderer  : function(val) {
+								return ['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'][val];
+							}
+						},{
+							text      : 'Plan Estimate',
+							dataIndex : 'PlanEstimate',
+							width     : 75,
+							align     : 'center'
+						},{
+							text      : 'Estimated Task Hours',
+							dataIndex : 'TaskEstimateTotal',
+							width     : 75,
+							align     : 'center'
+						},{
+							text      : 'Actual Task Hours',
+							dataIndex : 'TaskActualTotal',
+							width     : 75,
+							align     : 'center'
+						},{
+							text      : 'Remaining Task Hours',
+							dataIndex : 'TaskRemainingTotal',
+							width     : 75,
+							align     : 'center'
+						}]
+					});
 				});
 			}
 
-			function loadDetails(filter, callback) {
+			function loadDetails(callback) {
+				var iterOIDs = [];
+				var iterProjectHash = {};
 				Ext.create('Rally.data.WsapiDataStore', {
 					autoLoad: true,
-					model: 'UserStory',
-					fetch: [
-						'FormattedID',
-						'Name',
-						'ObjectID',
-						'Owner',
-						'PlanEstimate',
-						'Project',
-						'ScheduleState',
-						'TaskActualTotal',
-						'TaskEstimateTotal',
-						'TaskRemainingTotal'
-					],
-					filters: [
-						Rally.data.QueryFilter.or(filter),
-						App.down('#iterPicker').getQueryFromSelected()
-					],
+					model: 'Iteration',
+					filters: [{
+						property: 'Name',
+						value: App.down('#iterPicker').getRawValue()
+					}],
+					fetch: ['ObjectID','Project'],
 					listeners: {
 						load: function(store, data) {
-							Ext.Array.each(data, function(s) {
-								if (gridObj[s.get('Project').Name] == undefined)
-									gridObj[s.get('Project').Name] = [];
-								gridObj[s.get('Project').Name].push(s.raw);
+							Ext.Array.each(data, function(i) {
+								iterOIDs.push(i.raw.ObjectID);
+								iterProjectHash[i.raw.ObjectID] = i.raw.Project._refObjectName;
 							});
-							callback();
+
+							Ext.create('Rally.data.lookback.SnapshotStore', {
+								autoLoad: true,
+								pageSize: 10000,
+								filters: [{
+									property : '_TypeHierarchy',
+									value    : 'HierarchicalRequirement'
+								},{
+									property : '__At',
+									value    : 'current'
+								},{
+									property : '_ItemHierarchy',
+									value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].data.id
+								},{
+									property : 'Children',
+									vlue     : null
+								},{
+									property : 'Iteration',
+									operator : 'in',
+									value    : iterOIDs
+								}],
+								fetch: [
+									'_UnformattedID',
+									'Iteration',
+									'Name',
+									'ObjectID',
+									'Owner',
+									'PlanEstimate',
+									'ScheduleState',
+									'TaskActualTotal',
+									'TaskEstimateTotal',
+									'TaskRemainingTotal'
+								],
+								hydrate: ['ScheduleState'],
+								listeners: {
+									load: function(store, data) {
+										Ext.Array.each(data, function(s) {
+											s.raw.Team = iterProjectHash[s.raw.Iteration];
+											s.raw.State = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
+											gridArray.push(s.raw);
+										});
+										callback();
+									}
+								}
+							});
+
 						}
 					}
 				});
 			}
-
 		}
 	}
 });
