@@ -8,7 +8,9 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            
+            // Volatility Report v0.2
+            // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
+            // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             var PANEL_WIDTH = 280;
             Ext.define('CustomApp', {
                 extend: 'Rally.app.App',
@@ -22,7 +24,7 @@
                     split       : true
                 },
                 items: [{
-                    title   : 'Project',
+                    title   : 'Project Filter:',
                     region  : 'west',
                     margins : '5 0 0 0',
                     width   : PANEL_WIDTH,
@@ -81,20 +83,12 @@
                             }] 
                         }]
                     },{
-                        layout : 'hbox',
-                        id     : 'viewport',
-                        items  : [{
-                            xtype : 'container',
-                            id    : 'aGrid',
-                            width : '50%'
-                        },{
-                            xtype : 'container',
-                            id    : 'bGrid',
-                            width : '50%'
-                        }]
+                        id   : 'viewport',
+                        flex : 1,
+                        autoScroll : true
                     }]
                 },{
-                    title   : 'Team',
+                    title   : 'Team Filter:',
                     region  : 'east',
                     margins : '5 0 0 0',
                     width   : PANEL_WIDTH,
@@ -103,13 +97,26 @@
                         layout : 'fit',
                         border : 0,
                         flex   : 1
-                    }]
+                    }],
+                    layout: {
+                        type  : 'vbox',
+                        align : 'stretch',
+                        pack  : 'start',
+                    }
                 }],
             
                 launch: function() {
+                    Ext.getBody().mask('Loading...');
                     App = this;
                     App.rpmTree.init();
                     App.teamTree.init();
+                    //Once all UI elements are ready, do an initial query
+                    var uiWait = setInterval(function() {
+                        if (App.down('#iterPicker') && App.down('#projectTree') && App.down('#teamTree')) {
+                            clearInterval(uiWait);
+                            App.viewport.update();  
+                        }
+                    }, 500);
                 },
             
                 rpmTree: {
@@ -283,13 +290,14 @@
                 viewport: {
                     update: function() {
                         Ext.getBody().mask('Loading...');
-                        var aDate = Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2));
-                        var bDate = Rally.util.DateTime.toIsoString(new Date(App.down('#iterPicker').getRecord().get('EndDate')));
-                        var iterOIDs = [];
+                        var aDate           = Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(App.down('#iterPicker').getRecord().get('StartDate')), Ext.Date.DAY, 2)),
+                            bDate           = Rally.util.DateTime.toIsoString(new Date(App.down('#iterPicker').getRecord().get('EndDate'))),
+                            iterOIDs        = [],
+                            projectNameHash = {};
                         Ext.create('Rally.data.WsapiDataStore', {
                             autoLoad : true,
                             model    : 'Iteration',
-                            fetch    : ['ObjectID'],
+                            fetch    : ['Name','ObjectID','Project'],
                             filters  : [{
                                 property : 'Name',
                                 value    : App.down('#iterPicker').getRawValue()
@@ -297,95 +305,125 @@
                             listeners: {
                                 load: function(store, data) {
                                     Ext.Array.each(data, function(i) {
+                                        projectNameHash[i.raw.Project.ObjectID] = i.raw.Project._refObjectName;
                                         iterOIDs.push(i.raw.ObjectID);
                                     });
             
                                     getDataOn(aDate, function(aStories) {
                                         getDataOn(bDate, function(bStories) {
-                                            var aStoryArray = [],
-                                                bStoryArray = [];
-                                            //Mark removed/changed stories
-                                            for (a in aStories) {
-                                                aStories[a].EstVsActHours = (aStories[a].TaskEstimateTotal == 0) ? 1 : parseFloat(aStories[a].TaskActualTotal / aStories[a].TaskEstimateTotal) || 0.0;
-                                                if (bStories[a] == undefined) {
-                                                    aStories[a].ARC = 1;
-                                                } else if (aStories[a].PlanEstimate != bStories[a].PlanEstimate) {
-                                                    aStories[a].ARC = 2;
-                                                    bStories[a].ARC = 2;
-                                                } else {
-                                                    aStories[a].ARC = -1;
-                                                }
-                                                aStoryArray.push(aStories[a]);
-                                            }
+                                            var gridObj         = {},
+                                                gridArray       = [],
+                                                userStoryCount  = 0,
+                                                taskEstimateSum = 0,
+                                                taskActualSum   = 0;
+                                            
                                             //Mark added stories
                                             for (b in bStories) {
-                                                bStories[b].EstVsActHours = (bStories[b].TaskEstimateTotal == 0) ? 1 : parseFloat(bStories[b].TaskActualTotal / bStories[b].TaskEstimateTotal) || 0.0;
-                                                if (aStories[b] == undefined) {
-                                                    bStories[b].ARC = 0;
-                                                } else if (bStories[b].ARC == undefined) {
-                                                    bStories[b].ARC = -1;
+                                                gridObj[b] = bStories[b];
+                                                gridObj[b].EstVsActHours = (bStories[b].TaskEstimateTotal == 0) ? 1 : parseFloat(bStories[b].TaskActualTotal / bStories[b].TaskEstimateTotal) || 0.0;
+                                                if (aStories[b] == undefined) gridObj[b].ARC = 2; //Added
+                                                gridObj[b].CurrentState = bStories[b].ScheduleState;
+                                            }
+            
+                                            //Mark removed/changed stories
+                                            for (a in aStories) {
+                                                if (gridObj[a] == undefined) gridObj[a] = aStories[a];
+                                                if (bStories[a] == undefined) {
+                                                    gridObj[a].ARC = 1; //Removed
+                                                } else if (aStories[a].PlanEstimate != bStories[a].PlanEstimate) {
+                                                    gridObj[a].ARC = 0; //Changed
+                                                    gridObj[a].PlanEstimate = ((aStories[a].PlanEstimate === undefined) ? 'N/A' : aStories[a].PlanEstimate) + ' &rArr; ' + ((bStories[a].PlanEstimate === undefined) ? 'N/A' : bStories[a].PlanEstimate)
                                                 }
-                                                bStoryArray.push(bStories[b]);
+                                                gridObj[a].InitialState = aStories[a].ScheduleState;
                                             }
             
-                                            drawGrid(App.down('#aGrid'), aStoryArray);
-                                            drawGrid(App.down('#bGrid'), bStoryArray);
-            
-                                            function drawGrid(grid_container, grid_store) {
-                                                grid_container.removeAll();
-                                                grid_container.add({
-                                                    xtype             : 'rallygrid',
-                                                    disableSelection  : true,
-                                                    showPagingToolbar : false,
-                                                    store             : Ext.create('Rally.data.custom.Store', {
-                                                        data     : grid_store,
-                                                        fields   : ['ARC','_UnformattedID','Name','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal','EstVsActHours'],
-                                                        pageSize : 10000,
-                                                        sorters  : [
-                                                            { property: 'ARC',            direction: 'DESC' },
-                                                            { property: '_UnformattedID', direction: 'ASC'  }
-                                                        ]
-                                                    }),
-                                                    columnCfgs: [{
-                                                        text: '',
-                                                        dataIndex: 'ARC',
-                                                        width: 25,
-                                                        renderer: function(val) {
-                                                            return (val >= 0) ? '<div class="' + ['green','red','yellow'][val] + ' label square">' + ['+','-','C'][val] + '</div>' : '';
-                                                        }
-                                                    },{
-                                                        text: 'ID',
-                                                        dataIndex: '_UnformattedID',
-                                                        width: 60,
-                                                        renderer: function(val) {
-                                                            return 'US' + val;
-                                                        }
-                                                    },{
-                                                        text: 'Name',
-                                                        dataIndex: 'Name',
-                                                        flex: 1
-                                                    },{
-                                                        text: 'Plan Estimate Points',
-                                                        dataIndex: 'PlanEstimate',
-                                                        width: 60,
-                                                        align: 'center'
-                                                    },{
-                                                        text      : 'Actual vs Estimated Hours',
-                                                        dataIndex : 'EstVsActHours',
-                                                        width     : 130,
-                                                        align     : 'center',
-                                                        renderer  : function(val, meta, record) {
-                                                            return '<div class="label"><div class="align">' + Math.round(val * 100) + '%</div><div class="align">' + Math.round(record.get('TaskActualTotal')) + ' / ' + Math.round(record.get('TaskEstimateTotal')) + '</div></div>';
-                                                        }
-                                                    },{
-                                                        text: 'State',
-                                                        dataIndex: 'ScheduleState',
-                                                        width: 90,
-                                                        align: 'center'
-                                                    }]
-                                                });
+                                            for (o in gridObj) {
+                                                if (gridObj[o].ARC == undefined) gridObj[o].ARC = -1;
+                                                //Stats
+                                                userStoryCount++;
+                                                taskEstimateSum += gridObj[o].TaskEstimateTotal;
+                                                taskActualSum   += gridObj[o].TaskActualTotal;
+                                                gridArray.push(gridObj[o]);
                                             }
             
+                                            //Render the grid to the viewport
+                                            App.down('#viewport').removeAll();
+                                            App.down('#viewport').add({
+                                                xtype             : 'rallygrid',
+                                                disableSelection  : true,
+                                                showPagingToolbar : false,
+                                                store             : Ext.create('Rally.data.custom.Store', {
+                                                    data       : gridArray,
+                                                    fields     : ['ARC','InitialState','CurrentState','_UnformattedID','Name','ObjectID','PlanEstimate','Team','TaskActualTotal','TaskEstimateTotal','EstVsActHours'],
+                                                    groupField : 'Team',
+                                                    pageSize   : 10000,
+                                                    sorters    : [
+                                                        { property: 'Team',           direction: 'ASC'  },
+                                                        { property: 'ARC',            direction: 'DESC' },
+                                                        { property: '_UnformattedID', direction: 'ASC'  }
+                                                    ]
+                                                }),
+                                                features: [
+                                                    Ext.create('Ext.grid.feature.Grouping', {
+                                                        groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
+                                                    }),{
+                                                        ftype: 'summary'
+                                                    }
+                                                ],
+                                                columnCfgs: [{
+                                                    text      : '',
+                                                    dataIndex : 'ARC',
+                                                    width     : 25,
+                                                    renderer  : function(val) {
+                                                        return (val >= 0) ? '<div class="' + ['yellow','red','green'][val] + ' label square">' + ['C','-','+'][val] + '</div>' : '';
+                                                    }
+                                                },{
+                                                    text      : 'ID',
+                                                    dataIndex : '_UnformattedID',
+                                                    width     : 60,
+                                                    renderer  : function(val, meta, record) {
+                                                        return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('ObjectID') + '">US' + val + '</a>';
+                                                    }
+                                                },{
+                                                    text      : 'Name',
+                                                    dataIndex : 'Name',
+                                                    flex      : 1
+                                                },{
+                                                    text      : 'Plan Estimate Points',
+                                                    dataIndex : 'PlanEstimate',
+                                                    width     : 90,
+                                                    align     : 'center'
+                                                },{
+                                                    text      : 'Actual vs Estimated Hours',
+                                                    dataIndex : 'EstVsActHours',
+                                                    width     : 130,
+                                                    resizable : false,
+                                                    align     : 'center',
+                                                    renderer  : function(val, meta, record) {
+                                                        return '<div class="label"><div class="align">' + Math.round(val * 100) + '%</div><div class="align">' + Math.round(record.get('TaskActualTotal')) + ' / ' + Math.round(record.get('TaskEstimateTotal')) + '</div></div>';
+                                                    }
+                                                },{
+                                                    text      : 'Initial State',
+                                                    dataIndex : 'InitialState',
+                                                    width     : 90,
+                                                    align     : 'center',
+                                                    renderer  : function(val) {
+                                                        return (!val) ? 'N/A' : val;
+                                                    }
+                                                },{
+                                                    text      : 'Current State',
+                                                    dataIndex : 'CurrentState',
+                                                    width     : 90,
+                                                    align     : 'center',
+                                                    renderer  : function(val) {
+                                                        return (!val) ? 'N/A' : val;
+                                                    }
+                                                }]
+                                            });
+                                            App.down('#viewport').add({
+                                                border : 0,
+                                                html   : '<div class="gridSummary">Total User Stories: ' + Ext.util.Format.number(userStoryCount, '0,000') + '<br />Task Estimate: ' + Ext.util.Format.number(taskEstimateSum, '0,000.00') + ' Hours<br />Task Actual: ' + Ext.util.Format.number(taskActualSum, '0,000.00') + ' Hours</div>'
+                                            });
                                             Ext.getBody().unmask();
                                         });
                                     });
@@ -405,13 +443,14 @@
                                         Ext.create('Rally.data.lookback.SnapshotStore', {
                                             autoLoad  : true,
                                             filters   : filter,
-                                            fetch     : ['_UnformattedID','Name','PlanEstimate','ScheduleState','TaskActualTotal','TaskEstimateTotal'],
+                                            fetch     : ['_UnformattedID','Name','PlanEstimate','Project','ScheduleState','TaskActualTotal','TaskEstimateTotal'],
                                             hydrate   : ['ScheduleState'],
                                             pageSize  : 10000,
                                             listeners : {
                                                 load: function(store, data) {
                                                     var stories = {};
                                                     Ext.Array.each(data, function(i) {
+                                                        i.raw.Team = projectNameHash[i.raw.Project];
                                                         stories[i.raw.ObjectID] = i.raw;
                                                     });
                                                     callback(stories);
@@ -456,26 +495,16 @@
         	margin: 0 3px;
         }
         
-        #viewport, #aGrid, #bGrid {
-        	background: #B5D8EB;
-        }
-        
         #viewport {
         	border-top: 1px solid #3F84A4;
-        }
-        #aGrid {
-        	padding-right: 2px;
-        }
-        #bGrid {
-        	padding-left: 2px;
         }
         
         .label {
         	display       : inline-block;
         	padding       : 2px;
         	width         : 125px;
-        	height        : 20px;
-        	line-height   : 16px;
+        	height        : 15px;
+        	line-height   : 11px;
         	text-align    : center;
         	border-radius : 3px;
         	margin        : 0 2px 0 -4px;
@@ -487,10 +516,17 @@
         	width      : 60px;
         }
         
-        .green     { background    : #C6EFCE; }
-        .red       { background    : #FFC7CE; }
-        .yellow    { background    : #FFEB9C; }
-        .square    { width         : 20px;    }    </style>
+        .gridSummary {
+        	color       : #3764A0;
+        	font-weight : bold;
+        	font-size   : 10px;
+        	margin-left : 5px;
+        }
+        
+        .green     { background : #C6EFCE; }
+        .red       { background : #FFC7CE; }
+        .yellow    { background : #FFEB9C; }
+        .square    { width      : 15px;    }    </style>
 </head>
 <body></body>
 </html>

@@ -22,26 +22,16 @@
 	margin: 0 3px;
 }
 
-#viewport, #aGrid, #bGrid {
-	background: #B5D8EB;
-}
-
 #viewport {
 	border-top: 1px solid #3F84A4;
-}
-#aGrid {
-	padding-right: 2px;
-}
-#bGrid {
-	padding-left: 2px;
 }
 
 .label {
 	display       : inline-block;
 	padding       : 2px;
 	width         : 125px;
-	height        : 20px;
-	line-height   : 16px;
+	height        : 15px;
+	line-height   : 11px;
 	text-align    : center;
 	border-radius : 3px;
 	margin        : 0 2px 0 -4px;
@@ -53,7 +43,14 @@
 	width      : 60px;
 }
 
-.green     { background    : #C6EFCE; }
-.red       { background    : #FFC7CE; }
-.yellow    { background    : #FFEB9C; }
-.square    { width         : 20px;    }
+.gridSummary {
+	color       : #3764A0;
+	font-weight : bold;
+	font-size   : 10px;
+	margin-left : 5px;
+}
+
+.green     { background : #C6EFCE; }
+.red       { background : #FFC7CE; }
+.yellow    { background : #FFEB9C; }
+.square    { width      : 15px;    }
