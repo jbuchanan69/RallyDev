@@ -8,6 +8,10 @@
 	border-radius: 3px;
 }
 
+.note + .note {
+	margin-top: 5px;
+}
+
 .green    { background: #C6EFCE; }
 .red      { background: #FFC7CE; }
 .yellow   { background: #FFEB9C; }

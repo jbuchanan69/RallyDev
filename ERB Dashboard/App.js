@@ -1,4 +1,4 @@
-// ERB Dashboard - Version 2.2
+// ERB Dashboard - Version 2.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -82,12 +82,12 @@ Ext.define('CustomApp', {
             },
 
             getWeekInfo: function(callback) {
-                // Starting with the first Sunday of the year, get all release weeks
+                // Starting with the first Monday of the year, get all release weeks
                 var currWeek,
                     weekNumber = 1,
                     weeks      = [],
                     aDate      = new Date(App.down('#releaseYear').getValue(), 0, 1); // First day of the year
-                while (aDate.getDay() != 0) {
+                while (aDate.getDay() != 1) {
                     aDate.setDate(aDate.getDate() - 1);
                 }
                 do {
@@ -149,7 +149,7 @@ Ext.define('CustomApp', {
                             if (gridData[b].TestCases[tc].LastVerdict == 'Pass') bNode.TC_Pass_Count++;
                         }
                         for (n in gridData[b].Notes) {
-                            bNode.Notes += '<div>' + gridData[b].Notes[n] + '</div>';
+                            bNode.Notes += '<div class="note">' + gridData[b].Notes[n] + '</div>';
                         }
                         bNode.WI_Acpt_Rate = ((bNode.US_Store.length + bNode.DE_Store.length) == 0) ? 'N/A' : parseFloat((bNode.US_Acpt_Count + bNode.DE_Clos_Count) / (bNode.US_Store.length + bNode.DE_Store.length));
                         bNode.TC_Pass_Rate = (bNode.TC_Store.length == 0) ? 'N/A' : parseFloat(bNode.TC_Pass_Count / bNode.TC_Store.length);
@@ -163,7 +163,7 @@ Ext.define('CustomApp', {
                 var loader = Ext.create('Rally.data.WsapiDataStore', {
                     model: data_type,
                     fetch: [
-                        'Defects',      'FormattedID', 'FoundInBuild', 'Iteration', 'LastVerdict',   'Name',  'Notes',        'ObjectID',    'Owner',
+                        'Defects',      'FormattedID', 'FoundInBuild', 'Iteration', 'LastRun', 'LastVerdict',   'Name',  'Notes',        'ObjectID',    'Owner',
                         'PlanEstimate', 'Project',     'Release',      'Severity',  'ScheduleState', 'State', 'TechnicalSME', 'BusinessSME', 'TestCases'
                     ],
                     filters: [
@@ -306,6 +306,7 @@ Ext.define('CustomApp', {
                                     { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/defect/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                     { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                     { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
+                                    { text: 'Release',       dataIndex: 'Release',       flex: 1,   renderer: function(val) { return val._refObjectName; } },
                                     { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
                                     { text: 'State',         dataIndex: 'State',         width: 75  },
                                     { text: 'Work Product',  dataIndex: 'ParentText',    flex: 1    }
@@ -313,14 +314,15 @@ Ext.define('CustomApp', {
                                     property : 'Severity',
                                     value    : (column == 3) ? 'Critical' : 'High'
                                 }]);
-                            } else if (column == 5) {
+                            } else if (column == 5) { //Test Cases
                                 showPopup('Test Cases',record.get('TC_Store'),[
                                     { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/testcase/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                     { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                     { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                     { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
                                     { text: 'Work Product',  dataIndex: 'ParentText',    flex: 1    },
-                                    { text: 'Verdict',       dataIndex: 'LastVerdict',   width: 60  }
+                                    { text: 'Verdict',       dataIndex: 'LastVerdict',   width: 60  },
+                                    { text: 'Last Run',      dataIndex: 'LastRun',       width: 70, renderer: function(val) { return (val != undefined) ? val.substring(0,10) : '' } }
                                 ]);
                             }
 
@@ -342,7 +344,7 @@ Ext.define('CustomApp', {
                                         disableSelection  : true,
                                         store : Ext.create('Rally.data.custom.Store', {
                                             data     : data,
-                                            fields   : ['FormattedID','Name','ObjectID','ProjectName','OwnerName','Severity','ScheduleState','TechnicalSME','BusinessSME','State','ParentText','LastVerdict'],
+                                            fields   : ['Release','FormattedID','Name','ObjectID','LastRun','ProjectName','OwnerName','Severity','ScheduleState','TechnicalSME','BusinessSME','State','ParentText','LastVerdict'],
                                             filters  : supFilter,
                                             sorters  : [{
                                                 property  : 'FormattedID',
