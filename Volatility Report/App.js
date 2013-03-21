@@ -1,4 +1,4 @@
-// Volatility Report v0.3
+// Volatility Report v0.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 var PANEL_WIDTH = 280;
@@ -320,7 +320,8 @@ Ext.define('CustomApp', {
                                     gridArray       = [],
                                     userStoryCount  = 0,
                                     taskEstimateSum = 0,
-                                    taskActualSum   = 0;
+                                    taskActualSum   = 0,
+                                    taskRemainSum   = 0;
                                 
                                 //Mark added stories
                                 for (b in bStories) {
@@ -348,6 +349,7 @@ Ext.define('CustomApp', {
                                     userStoryCount++;
                                     taskEstimateSum += gridObj[o].TaskEstimateTotal;
                                     taskActualSum   += gridObj[o].TaskActualTotal;
+                                    taskRemainSum   += gridObj[o].TaskRemainingTotal;
                                     gridArray.push(gridObj[o]);
                                 }
 
@@ -359,7 +361,7 @@ Ext.define('CustomApp', {
                                     showPagingToolbar : false,
                                     store             : Ext.create('Rally.data.custom.Store', {
                                         data       : gridArray,
-                                        fields     : ['ARC','InitialState','CurrentState','_UnformattedID','Name','ObjectID','PlanEstimate','Team','TaskActualTotal','TaskEstimateTotal','EstVsActHours'],
+                                        fields     : ['ARC','InitialState','CurrentState','_UnformattedID','Name','ObjectID','PlanEstimate','Team','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal','EstVsActHours'],
                                         groupField : 'Team',
                                         pageSize   : 10000,
                                         sorters    : [
@@ -408,6 +410,11 @@ Ext.define('CustomApp', {
                                             return '<div class="label"><div class="align">' + Math.round(val * 100) + '%</div><div class="align">' + Math.round(record.get('TaskActualTotal')) + ' / ' + Math.round(record.get('TaskEstimateTotal')) + '</div></div>';
                                         }
                                     },{
+                                        text      : 'Remaining Hours',
+                                        dataIndex : 'TaskRemainingTotal',
+                                        width     : 65,
+                                        align     : 'center'
+                                    },{
                                         text      : 'Initial State',
                                         dataIndex : 'InitialState',
                                         width     : 90,
@@ -427,7 +434,7 @@ Ext.define('CustomApp', {
                                 });
                                 App.down('#viewport').add({
                                     border : 0,
-                                    html   : '<div class="gridSummary">Total User Stories: ' + Ext.util.Format.number(userStoryCount, '0,000') + '<br />Task Estimate: ' + Ext.util.Format.number(taskEstimateSum, '0,000.00') + ' Hours<br />Task Actual: ' + Ext.util.Format.number(taskActualSum, '0,000.00') + ' Hours</div>'
+                                    html   : '<div class="gridSummary">Total User Stories: ' + Ext.util.Format.number(userStoryCount, '0,000') + '<br />Task Estimate: ' + Ext.util.Format.number(taskEstimateSum, '0,000.00') + ' Hours<br />Task Actual: ' + Ext.util.Format.number(taskActualSum, '0,000.00') + ' Hours<br />Task Remaining: ' + Ext.util.Format.number(taskRemainSum, '0,000.00') + ' Hours</div>'
                                 });
                                 Ext.getBody().unmask();
                             });
@@ -448,7 +455,7 @@ Ext.define('CustomApp', {
                             Ext.create('Rally.data.lookback.SnapshotStore', {
                                 autoLoad  : true,
                                 filters   : filter,
-                                fetch     : ['_UnformattedID','Name','PlanEstimate','Project','ScheduleState','TaskActualTotal','TaskEstimateTotal'],
+                                fetch     : ['_UnformattedID','Name','PlanEstimate','Project','ScheduleState','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
                                 hydrate   : ['ScheduleState'],
                                 pageSize  : 10000,
                                 listeners : {
