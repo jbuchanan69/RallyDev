@@ -1,4 +1,4 @@
-// Volatility Report v0.2
+// Volatility Report v0.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 var PANEL_WIDTH = 280;
@@ -15,6 +15,7 @@ Ext.define('CustomApp', {
     },
     items: [{
         title   : 'Project Filter:',
+        id      : 'leftPopout',
         region  : 'west',
         margins : '5 0 0 0',
         width   : PANEL_WIDTH,
@@ -79,6 +80,7 @@ Ext.define('CustomApp', {
         }]
     },{
         title   : 'Team Filter:',
+        id      : 'rightPopout',
         region  : 'east',
         margins : '5 0 0 0',
         width   : PANEL_WIDTH,
@@ -118,9 +120,22 @@ Ext.define('CustomApp', {
                 listeners: {
                     load: function(store, data) {
                         if (data.length == 0) {
-                            App.removeAll();
-                            Ext.getBody().unmask();
-                            Ext.Msg.alert('Error', '<div class="error">This app must be ran within a context which features Initiative Portfolio Items.<br />Please change your project scope and try again.</div>');
+                            App.down('#leftPopout').collapse();
+                            App.down('#projectTreePopout').add({
+                                xtype            : 'treepanel',
+                                id               : 'projectTree',
+                                rootVisible      : false,
+                                disableSelection : true,
+                                store : Ext.create('Ext.data.TreeStore', {
+                                    root: {
+                                        expanded: true,
+                                        children: [{
+                                            text : 'N/A',
+                                            leaf : true
+                                        }]
+                                    }
+                                }),
+                            });
                             return;
                         } else {
                             var roots = [];
