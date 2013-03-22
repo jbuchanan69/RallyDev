@@ -8,7 +8,7 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // ERB Dashboard - Version 2.3
+            // ERB Dashboard - Version 2.3.1
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -205,10 +205,12 @@
                                                     gridData[x.raw.Release._refObjectName].Defects.push(x.raw);
                                                 }
                                                 Ext.Array.each(x.raw.Defects, function(d) {
-                                                    d.ProjectName = (d.Project) ? d.Project._refObjectName : '';
-                                                    d.OwnerName   = (d.Owner)   ? d.Owner._refObjectName   : '';
-                                                    d.ParentText  = '<b>' + x.raw.FormattedID + ': </b>' + x.raw._refObjectName;
-                                                    gridData[x.raw.Release._refObjectName].Defects.push(d);
+                                                    if (d.Severity != 'Low' && d.Severity != 'Medium') {
+                                                        d.ProjectName = (d.Project) ? d.Project._refObjectName : '';
+                                                        d.OwnerName   = (d.Owner)   ? d.Owner._refObjectName   : '';
+                                                        d.ParentText  = '<b>' + x.raw.FormattedID + ': </b>' + x.raw._refObjectName;
+                                                        gridData[x.raw.Release._refObjectName].Defects.push(d);
+                                                    }
                                                 });
                                                 Ext.Array.each(x.raw.TestCases, function(t) {
                                                     t.ProjectName = (t.Project) ? t.Project._refObjectName : '';
