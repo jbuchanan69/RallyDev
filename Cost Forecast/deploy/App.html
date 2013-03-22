@@ -8,7 +8,7 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // Cost Forecast - Version 3.1.1
+            // Cost Forecast - Version 3.2
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -74,164 +74,104 @@
             		});
                 },
             
-                rpmTree: {
-                	init: function() {
-            			//Load RPM roots
+            rpmTree: {
+            		init: function() {
             			Ext.create('Rally.data.WsapiDataStore', {
-            				autoLoad : true,
-            				model    : 'portfolioitem/initiative',
-            				fetch    : [ 'Children', 'Name', 'ObjectID' ],
-            				listeners: {
-            					load: function(model, roots) {
-            						//Create tree store using roots
-            						var nodes = [];
-            						var childFilter = [];
-            						Ext.Array.each(roots, function(root) {
-            							getDescendants(root.get('ObjectID'), function(descendants) {
-            								childFilter = [];
-            								Ext.Array.each(root.get('Children'), function(c) {
-            									childFilter.push({
-            										property: 'ObjectID',
-            										value: c.ObjectID
-            									});
-            								});
-            								nodes.push({
-            									name        : root.get('Name'),
-            									childFilter : childFilter,
-            									text        : '<span class="count">' + descendants.length + '</span> - ' + root.get('Name'),
-            									id          : root.get('ObjectID'),
-            									leaf        : root.raw.Children == undefined || root.raw.Children.length == 0,
-            									descendants : descendants
-            								});
-            								if (nodes.length == roots.length) {
-            									nodes.sort(function(a, b) {
-            										return a.name > b.name;
-            									});
-            									drawTree();
-            								}
+            	            autoLoad: true,
+            	            model: 'PortfolioItem/Initiative',
+            	            fetch: ['Children','LeafStoryCount','Name','ObjectID'],
+            	            listeners: {
+            	                load: function(store, data) {
+            	                    if (data.length == 0) {
+            							App.removeAll();
+            							Ext.getBody().unmask();
+            							Ext.Msg.alert('Error', '<div class="error">This app must be ran within a context which features Initiative Portfolio Items.<br />Please change your project scope and try again.</div>');
+            							return;
+            						} else {
+            							var roots = [];
+            							Ext.Array.each(data, function(i) {
+            		                    	roots.push({
+            		                    		name : i.raw.Name,
+            		                    		text : '<span class="count">' + i.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + i.raw.Name + '</span>',
+            		                    		id   : i.raw.ObjectID,
+            		                    		leaf : i.raw.Children == undefined || i.raw.Children.length == 0
+            		                    	});
+            		                    });
+            		                    roots.sort(function(a, b) {
+            								return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
             							});
-            						});
-            
-            						function drawTree() {
-            							var treeStore = Ext.create('Ext.data.TreeStore', {
-            								root: {
-            									expanded : true,
-            									children : nodes
-            								}
-            							});
-            							var newCount = 0;
-            							//Add tree to UI element
-            							App.down('#leftPopout').add({
-            								xtype       : 'treepanel',
-            								store       : treeStore,
-            								id          : 'rpmTree',
-            								rootVisible : false,
-            								margin      : '-1 0 0 0',
-            								simpleSelect: true,
-            								listeners: {
-            									beforeitemexpand: function(node) {
-            										if (node.hasChildNodes() == false && node.raw.childFilter.length > 0) { //Query for children of selected node
-            											var newNodes = [];
-            											var childLoader = Ext.create('Rally.data.WsapiDataStore', {
-            												context: {
-            													project: '/project/' + 2147979614,
-            													projectScopeDown: true
-            												},
-            												model     : 'portfolioitem',
-            												fetch     : [ 'Children', 'Name', 'ObjectID' ],
-            												filters   : [ Rally.data.QueryFilter.or(node.raw.childFilter) ],
-            												listeners : {
-            													load  : function(model, children) {
-            														newCount = children.length;
-            														Ext.Array.each(children, function(child) {
-            															getDescendants(child.get('ObjectID'), function(descendants) {
-            																childFilter = [];
-            																Ext.Array.each(child.raw.Children, function(c) {
-            																	childFilter.push({
-            																		property : 'ObjectID',
-            																		value    : c.ObjectID
-            																	});
-            																});
-            																newNodes.push({
-            																	name        : child.get('Name'),
-            																	childFilter : childFilter,
-            																	text        : '<span class="count">' + descendants.length + '</span> - ' + child.get('Name'),
-            																	id          : child.get('ObjectID'),
-            																	leaf        : child.raw.Children == undefined || child.raw.Children.length == 0,
-            																	descendants : descendants
-            																});
-            															});
-            														});
-            													}
-            												}
-            											});
-            											childLoader.loadPages({
-            												callback: function() {
-            													var nodeWait = setInterval(function() {
-            														if (newNodes.length == newCount) {
-            															Ext.Array.each(newNodes.sort(function(a, b) {
-            																return a.name > b.name;
-            															}), function(n) {
-            																node.appendChild(n);
-            															});
-            															clearInterval(nodeWait);
-            														}
-            													}, 50);
-            												}
-            											});
-            										}
-            									},
-            									selectionchange: function() {
-            										App.viewport.update();
-            									},
-            									added: function() {
-            										Ext.getBody().unmask();
-            									}
-            								}
-            							});
+            		                    drawTree(roots);
             						}
-            						
-            						function getDescendants(OID, callback) {
-            							Ext.create('Rally.data.lookback.SnapshotStore', {
-            				    			autoLoad: true,
-            				    			pageSize: 1000000,
-            				    			fetch: ['ObjectID'],
-            				    			filters: [
-            				    			    { property: '_ItemHierarchy', value: OID                       },
-            				    				{ property: 'Children',       value: null                      },
-            				    				{ property: '__At',           value: new Date().toISOString()  },
-            				    				{ property: '_TypeHierarchy', value: 'HierarchicalRequirement' }
-            				    			],
-            				                listeners: {
-            				                	load: function(model, data, success) {
-            				                		if (data && data.length && success) {
-            				                			var descendants = [];
-            				                			Ext.Array.each(data, function(story) {
-            				                				descendants.push(story.get('ObjectID'));
-            				                			});
-            				                			callback(Ext.Array.unique(descendants));
-            				                		} else {
-            				                			callback([]);
-            				                		}
-            				                	}
-            				                }
-            				            });
+            	                }
+            	            }
+            	        });
+            
+            			function drawTree(roots) {
+            				App.down('#leftPopout').add({
+            					xtype        : 'treepanel',
+            					store        : Ext.create('Ext.data.TreeStore', {
+            						root: {
+            							expanded: true,
+            							children: roots
+            						}
+            					}),
+            					id           : 'rpmTree',
+            					rootVisible  : false,
+            					margin       : '-1 0 0 0',
+            					border       : 0,
+            					listeners    : {
+            						added    : function() {
+            							Ext.getBody().unmask();
+            						},
+            						beforeitemexpand: function(node) {
+            							if (node.hasChildNodes() == false) { // Child nodes have not been populated yet
+            								getChildren('Rollup', function(rollup_children) {
+            									getChildren('Feature', function(feature_children) {
+            										var children = [];
+            										Ext.Array.each(rollup_children.concat(feature_children), function(c) {
+            											children.push({
+            					                    		name : c.raw.Name,
+            					                    		text : '<span class="count">' + c.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + c.raw.Name + '</span>',
+            					                    		id   : c.raw.ObjectID,
+            					                    		leaf : c.raw.Children == undefined || c.raw.Children.length == 0
+            					                    	});
+            										});
+            										Ext.Array.each(children.sort(function(a, b) {
+            											return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
+            										}), function(n) {
+            											node.appendChild(n);
+            										});
+            									});
+            								});
+            							}
+            
+            							function getChildren(child_type, callback) {
+            								Ext.create('Rally.data.WsapiDataStore', {
+            									autoLoad: true,
+            									model: 'PortfolioItem/' + child_type,
+            									filters: [{
+            										property: 'Parent.ObjectID',
+            										value: node.raw.id
+            									}],
+            									fetch: ['Children','LeafStoryCount','Name','ObjectID'],
+            									listeners: {
+            										load: function(store, data) {
+            											callback(data);
+            										}
+            									}
+            								});
+            							}
+            
+            						},
+            						selectionchange: function() {
+            							App.viewport.update();
             						}
             					}
-            				}
-            			});
-                	},
-            
-                	getAllDescendants: function() {
-                		var descendants = [];
-                		Ext.Array.each(App.down('#rpmTree').getSelectionModel().getSelection(), function(node) {
-            				Ext.Array.each(node.raw.descendants, function(descendant) {
-            					descendants.push(descendant);
             				});
-            			});
-                		return Ext.Array.unique(descendants);
-                	}
-                },
+            				
+            			}
+            		}
+            	},
             
                 viewport: {
             		iterations : [],
@@ -242,26 +182,51 @@
             			App.viewport.gridArray  = [];
             			var filter              = [];
             			var qCount              = 0;
-            			var descendantOIDs      = App.rpmTree.getAllDescendants();
+            			var descendantOIDs      = [];
             
-            			var leftToLoad = descendantOIDs.length;
-            
-                		if (descendantOIDs.length > 0) {
-                			Ext.getBody().mask('Parsing ' + descendantOIDs.length + ' User Stories...');
-            	    		Ext.Array.each(descendantOIDs, function(OID, key) {
-            	    			if (App.storyData[OID] == undefined) {
-            		    			filter.push({
-            							property : 'ObjectID',
-            							value    : OID
-            						});
-            		    		}
-            	    			if (filter.length == 50 || key == descendantOIDs.length - 1) {
-            	    				qCount++;
-            	    				getDetails(filter);
-            	    				filter = [];
-            	    			}
-            	    		});
-                		}
+            			Ext.create('Rally.data.lookback.SnapshotStore', {
+                			autoLoad: true,
+                			pageSize: 10000,
+                			filters: [{
+                				property : '__At',
+                				value    : 'current'
+                			},{
+                				property : '_TypeHierarchy',
+                				value    : 'HierarchicalRequirement'
+                			},{
+                				property : '_ItemHierarchy',
+                				value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+                			},{
+                				property : 'Children',
+                				value    : null
+                			}],
+                			fetch: ['ObjectID'],
+                			listeners: {
+                				load: function(store, data, success) {
+                					console.log(success);
+                					Ext.Array.each(data, function(s) {
+                						descendantOIDs.push(s.raw.ObjectID);
+                					});
+                					var leftToLoad = descendantOIDs.length;
+            			    		if (descendantOIDs.length > 0) {
+            			    			Ext.getBody().mask('Parsing ' + descendantOIDs.length + ' User Stories...');
+            				    		Ext.Array.each(descendantOIDs, function(OID, key) {
+            				    			if (App.storyData[OID] == undefined) {
+            					    			filter.push({
+            										property : 'ObjectID',
+            										value    : OID
+            									});
+            					    		}
+            				    			if (filter.length == 50 || key == descendantOIDs.length - 1) {
+            				    				qCount++;
+            				    				getDetails(filter);
+            				    				filter = [];
+            				    			}
+            				    		});
+            			    		}
+                				}
+                			}
+                		});
             
                 		function getDetails(filter) {
                 			var taskOwners;
