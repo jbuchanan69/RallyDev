@@ -1,4 +1,4 @@
-// RPM Burnup v0.2
+// RPM Burnup v0.2.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -171,7 +171,7 @@ Ext.define('CustomApp', {
             if (xEnd > new Date()) xEnd = new Date(); // Don't worry about the future
             var queryDelta = Math.ceil(Math.abs((xStart.getTime() - xEnd.getTime())/(86400000))); // Days between start and end date
             queryDelta = Math.round(queryDelta / 50);
-            if (queryDelta == 0) queryDelta = 1;
+            if (queryDelta <= 0) queryDelta = 1;
             while (xStart <= xEnd) {
                 qDates.push(Rally.util.DateTime.toIsoString(xStart));
                 xStart = Ext.Date.add(xStart, Ext.Date.DAY, queryDelta);
