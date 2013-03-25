@@ -8,7 +8,7 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // RPM Burnup v0.1
+            // RPM Burnup v0.2
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -167,11 +167,10 @@
             
                 viewport: {
                 	update: function() {
-                        Ext.getBody().mask('Loading...');
+                        Ext.getBody().mask('Loading: 0%');
                 		var xStart = App.down('#projectTree').getSelectionModel().getSelection()[0].raw.start,
                             xEnd   = App.down('#projectTree').getSelectionModel().getSelection()[0].raw.end;
                         if (!xStart || !xEnd) {
-                            //Ext.Msg.alert('Error', 'The selected project does not have a planned start and end date defined. A range of the past 30 days will be used until these properties are set.');
                             xStart = Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(), Ext.Date.DAY, -30));
                             xEnd   = Rally.util.DateTime.toIsoString(new Date());
                         }
@@ -182,21 +181,29 @@
                         if (xEnd > new Date()) xEnd = new Date(); // Don't worry about the future
                         var queryDelta = Math.ceil(Math.abs((xStart.getTime() - xEnd.getTime())/(86400000))); // Days between start and end date
                         queryDelta = Math.round(queryDelta / 50);
+                        if (queryDelta == 0) queryDelta = 1;
                         while (xStart <= xEnd) {
                             qDates.push(Rally.util.DateTime.toIsoString(xStart));
                             xStart = Ext.Date.add(xStart, Ext.Date.DAY, queryDelta);
                         }
                         var remaining = qDates.length;
-                        Ext.Array.each(qDates, function(d, k) {
-                            getPointsOn(d, function(totalPoints, acceptedPoints) {
-                                qDates[k] = {
-                                    date     : d.substring(5,10).replace('-','/'),
-                                    Total    : totalPoints,
-                                    Accepted : acceptedPoints
-                                };
-                                if (!--remaining) drawChart();
+                        if (remaining == 0) {
+                            drawChart();
+                        } else {
+                            var initial = remaining;
+                            Ext.Array.each(qDates, function(d, k) {
+                                getPointsOn(d, function(totalPoints, acceptedPoints) {
+                                    qDates[k] = {
+                                        date     : d.substring(5,10).replace('-','/'),
+                                        Total    : totalPoints,
+                                        Accepted : acceptedPoints
+                                    };
+                                    Ext.getBody().mask('Loading: ' + parseInt((1 - (remaining / initial)) * 100) + '%');
+                                    if (!--remaining) drawChart();
+                                });
                             });
-                        });
+                        }
+                            
             
                         function getPointsOn(date, callback) {
                             Ext.create('Rally.data.lookback.SnapshotStore', {
