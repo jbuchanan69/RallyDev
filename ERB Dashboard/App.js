@@ -15,7 +15,8 @@ Ext.define('CustomApp', {
     }],
 
 	launch: function() {
-        App = this;
+        App     = this;
+        App.ENV = 'rally1';
         App.Toolbar.init();
         App.down('#viewport').addListener('resize', function() {
             if (App.popup) {
@@ -40,8 +41,11 @@ Ext.define('CustomApp', {
                     App.Toolbar.WeekPicker.update();
                 },
                 onSpinDown: function() {
-                    this.setValue(parseInt(this.getValue()) - 1);
-                    App.Toolbar.WeekPicker.update();
+                    var val = parseInt(this.getValue()) - 1;
+                    if (val >= 2013) {
+                        this.setValue(val);
+                        App.Toolbar.WeekPicker.update();
+                    }
                 },
                 listeners: {
                     added: function() {
@@ -160,6 +164,8 @@ Ext.define('CustomApp', {
             });
 
             function getData(data_type, callback) {
+                console.log(App.down('#releaseWeek').getValue().StartDate);
+                console.log(App.down('#releaseWeek').getValue().EndDate);
                 var loader = Ext.create('Rally.data.WsapiDataStore', {
                     model: data_type,
                     fetch: [
@@ -292,7 +298,7 @@ Ext.define('CustomApp', {
                             var column = view.getPositionByEvent(evt).column;
                             if (column == 2) {
                                 showPopup('User Stories',record.get('US_Store').concat(record.get('DE_Store')),[
-                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/' + ((val.match(/US/)) ? 'userstory' : 'defect') + '/' + record.get('ObjectID') + '">' + val + '</a>'; }},
+                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://' + App.ENV + '.rallydev.com/#/detail/' + ((val.match(/US/)) ? 'userstory' : 'defect') + '/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                     { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                     { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                     { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
@@ -305,7 +311,7 @@ Ext.define('CustomApp', {
                                 if ((column == 3 && record.get('DE_Crit_Count') == 0) ||
                                     (column == 4 && record.get('DE_High_Count') == 0)) return;
                                 showPopup('Defects',record.get('DE_Store'),[
-                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/defect/' + record.get('ObjectID') + '">' + val + '</a>'; }},
+                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://' + App.ENV + '.rallydev.com/#/detail/defect/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                     { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                     { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                     { text: 'Release',       dataIndex: 'Release',       flex: 1,   renderer: function(val) { return val._refObjectName; } },
@@ -318,7 +324,7 @@ Ext.define('CustomApp', {
                                 }]);
                             } else if (column == 5) { //Test Cases
                                 showPopup('Test Cases',record.get('TC_Store'),[
-                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/testcase/' + record.get('ObjectID') + '">' + val + '</a>'; }},
+                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://' + App.ENV + '.rallydev.com/#/detail/testcase/' + record.get('ObjectID') + '">' + val + '</a>'; }},
                                     { text: 'Name',          dataIndex: 'Name',          flex: 1    },
                                     { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
                                     { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
