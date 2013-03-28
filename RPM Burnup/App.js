@@ -1,4 +1,4 @@
-// RPM Burnup v0.5.1
+// RPM Burnup v0.6
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -103,7 +103,7 @@ Ext.define('CustomApp', {
                                     end      : i.raw.PlannedEndDate,
                                     actStart : i.raw.ActualStartDate,
                                     actEnd   : i.raw.ActualEndDate,
-                                    acptStr  : parseInt((i.raw.AcceptedLeafStoryCount / i.raw.LeafStoryCount) * 100) + '% (' + i.raw.AcceptedLeafStoryCount + ' / ' + i.raw.LeafStoryCount + ')',
+                                    acptStr  : ((i.raw.AcceptedLeafStoryCount == 0 || i.raw.LeafStoryCount == 0) ? '0' : Math.round((i.raw.AcceptedLeafStoryCount / i.raw.LeafStoryCount) * 100)) + '% (' + i.raw.AcceptedLeafStoryCount + ' / ' + i.raw.LeafStoryCount + ')',
                                     unEstCt  : i.raw.UnEstimatedLeafStoryCount
                                 });
                             });
@@ -146,7 +146,7 @@ Ext.define('CustomApp', {
                                                 end      : c.raw.PlannedEndDate,
                                                 actStart : c.raw.ActualStartDate,
                                                 actEnd   : c.raw.ActualEndDate,
-                                                acptStr  : parseInt((c.raw.LeafStoryCount / c.raw.AcceptedLeafStoryCount) * 100) + '% (' + c.raw.AcceptedLeafStoryCount + ' / ' + c.raw.LeafStoryCount + ')',
+                                                acptStr  : ((c.raw.AcceptedLeafStoryCount == 0 || c.raw.LeafStoryCount == 0) ? '0' : Math.round((c.raw.AcceptedLeafStoryCount / c.raw.LeafStoryCount) * 100)) + '% (' + c.raw.AcceptedLeafStoryCount + ' / ' + c.raw.LeafStoryCount + ')',
                                                 unEstCt  : c.raw.UnEstimatedLeafStoryCount
                                             });
                                         });
@@ -359,6 +359,10 @@ Ext.define('CustomApp', {
                             d.Color    = 'rgb(113,205,91)';
                         }
                     });
+                    for (var d = qDates.length - 1; d > 0; d--) {
+                        if (qDates[d].Planned == qDates[d-1].Planned) qDates[d].Planned = 0;
+                        else break;
+                    }
                     drawChart();
                 }
 
@@ -410,7 +414,7 @@ Ext.define('CustomApp', {
                     xtype  : 'container',
                     layout : 'fit',
                     height : 20,
-                    html   : '<div class="chart_title">"' + App.down('#projectTree').getSelectionModel().getSelection()[0].raw.name + '" Project Burn-Up</div>'
+                    html   : '<div class="chart_title">"' + App.down('#projectTree').getSelectionModel().getSelection()[0].raw.name + '" Burn-Up</div>'
                 });
                 var popupListener = {
                     itemmousedown : function(obj) {
