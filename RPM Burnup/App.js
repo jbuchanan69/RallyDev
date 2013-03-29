@@ -408,6 +408,10 @@ Ext.define('CustomApp', {
             }
 
             function drawChart() {
+                for (var d = qDates.length - 1; d > 0; d--) {
+                    if (qDates[d].dateStr > Rally.util.DateTime.toIsoString(new Date())) qDates[d].Accepted = 0;
+                    else break;
+                }
                 Ext.getBody().unmask();
                 App.down('#viewport').removeAll();
                 App.down('#viewport').add({
