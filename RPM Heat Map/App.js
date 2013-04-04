@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 2.3.3
+// RPM Heat Map - Version 2.3.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -210,9 +210,8 @@ Ext.define('CustomApp', {
 
 	iterPicker : {
 		getIterOIDs: function(callback) {
-			var OIDs = [];
-			Ext.create('Rally.data.WsapiDataStore', {
-				autoLoad : true,
+			var OIDs   = [];
+			var loader = Ext.create('Rally.data.WsapiDataStore', {
 				model    : 'Iteration',
 				fetch    : ['ObjectID'],
 				filters  : [{
@@ -221,13 +220,18 @@ Ext.define('CustomApp', {
 				}],
 				listeners: {
 					load: function(store, data) {
-						Ext.Array.each(data, function(i) {
-							OIDs.push(i.raw.ObjectID);
-						});
-						callback(OIDs);
+						if (data && data.length) {
+							Ext.Array.each(data, function(i) {
+								OIDs.push(i.raw.ObjectID);
+							});
+							loader.nextPage();
+						} else {
+							callback(OIDs);	
+						}
 					}
 				}
 			});
+			loader.loadPage(1);
 		}
 	},
 
@@ -415,8 +419,8 @@ Ext.define('CustomApp', {
 						store : Ext.create('Rally.data.custom.Store', {
 							data     : gridArray,
 							sorters  : [
-								{ property: 'AcceptedByPoints', direction: 'DESC' },
-								{ property: 'FinalScope',       direction: 'DESC' }
+								{ property: 'Color', direction: 'ASC' },
+								{ property: 'Team',  direction: 'ASC' }
 							],
 							pageSize : 1000
 						}),
