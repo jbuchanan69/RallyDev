@@ -1,4 +1,4 @@
-// RPM Work Item Composition - Version 1.2
+// RPM Story Teller - Version 1.2.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -65,7 +65,7 @@ Ext.define('CustomApp', {
 		App.rpmTree.init();
 	},
 
-rpmTree: {
+	rpmTree: {
 		init: function() {
 			Ext.create('Rally.data.WsapiDataStore', {
 	            autoLoad: true,
@@ -246,8 +246,7 @@ rpmTree: {
 			function loadDetails(callback) {
 				var iterOIDs = [];
 				var iterProjectHash = {};
-				Ext.create('Rally.data.WsapiDataStore', {
-					autoLoad: true,
+				var loader = Ext.create('Rally.data.WsapiDataStore', {
 					model: 'Iteration',
 					filters: [{
 						property: 'Name',
@@ -256,59 +255,62 @@ rpmTree: {
 					fetch: ['ObjectID','Project'],
 					listeners: {
 						load: function(store, data) {
-							Ext.Array.each(data, function(i) {
-								iterOIDs.push(i.raw.ObjectID);
-								iterProjectHash[i.raw.ObjectID] = i.raw.Project._refObjectName;
-							});
-
-							Ext.create('Rally.data.lookback.SnapshotStore', {
-								autoLoad: true,
-								pageSize: 10000,
-								filters: [{
-									property : '_TypeHierarchy',
-									value    : 'HierarchicalRequirement'
-								},{
-									property : '__At',
-									value    : 'current'
-								},{
-									property : '_ItemHierarchy',
-									value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].data.id
-								},{
-									property : 'Children',
-									vlue     : null
-								},{
-									property : 'Iteration',
-									operator : 'in',
-									value    : iterOIDs
-								}],
-								fetch: [
-									'_UnformattedID',
-									'Iteration',
-									'Name',
-									'ObjectID',
-									'Owner',
-									'PlanEstimate',
-									'ScheduleState',
-									'TaskActualTotal',
-									'TaskEstimateTotal',
-									'TaskRemainingTotal'
-								],
-								hydrate: ['ScheduleState'],
-								listeners: {
-									load: function(store, data) {
-										Ext.Array.each(data, function(s) {
-											s.raw.Team = iterProjectHash[s.raw.Iteration];
-											s.raw.State = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
-											gridArray.push(s.raw);
-										});
-										callback();
+							if (data && data.length) {
+								Ext.Array.each(data, function(i) {
+									iterOIDs.push(i.raw.ObjectID);
+									iterProjectHash[i.raw.ObjectID] = i.raw.Project._refObjectName;
+								});
+								loader.nextPage();
+							} else {
+								Ext.create('Rally.data.lookback.SnapshotStore', {
+									autoLoad: true,
+									pageSize: 10000,
+									filters: [{
+										property : '_TypeHierarchy',
+										value    : 'HierarchicalRequirement'
+									},{
+										property : '__At',
+										value    : 'current'
+									},{
+										property : '_ItemHierarchy',
+										value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].data.id
+									},{
+										property : 'Children',
+										value     : null
+									},{
+										property : 'Iteration',
+										operator : 'in',
+										value    : iterOIDs
+									}],
+									fetch: [
+										'_UnformattedID',
+										'Iteration',
+										'Name',
+										'ObjectID',
+										'Owner',
+										'PlanEstimate',
+										'ScheduleState',
+										'TaskActualTotal',
+										'TaskEstimateTotal',
+										'TaskRemainingTotal'
+									],
+									hydrate: ['ScheduleState'],
+									listeners: {
+										load: function(store, data) {
+											Ext.Array.each(data, function(s) {
+												s.raw.Team = iterProjectHash[s.raw.Iteration];
+												s.raw.State = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
+												gridArray.push(s.raw);
+											});
+											callback();
+										}
 									}
-								}
-							});
-
+								});
+							}
 						}
 					}
 				});
+				loader.loadPage(1);
 			}
 		}
 	}
