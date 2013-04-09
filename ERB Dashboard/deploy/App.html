@@ -8,7 +8,7 @@
 
 		<script type="text/javascript">
 				Rally.onReady(function() {
-            // ERB Dashboard - Version 2.3.1
+            // ERB Dashboard - Version 2.3.2
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -130,52 +130,87 @@
                         getData('UserStory', function() {
                             getData('Defect', function() {
                                 //Process data into grid array
-                                var bNode;
-                                for (b in gridData) {
-                                    bNode = {
-                                        Project       : (b.match(/( - )(.+)(:)/)) ? b.match(/( - )(.+)(:)/)[2] : '',
-                                        Bundle        : b,
-                                        US_Acpt_Count : 0,
-                                        DE_Crit_Count : 0,
-                                        DE_High_Count : 0,
-                                        DE_Clos_Count : 0,
-                                        TC_Pass_Count : 0,
-                                        Notes         : '',
-                                        US_Store      : gridData[b].UserStories,
-                                        DE_Store      : gridData[b].Defects,
-                                        TC_Store      : gridData[b].TestCases
-                                    };
-                                    for (us in gridData[b].UserStories) {
-                                        if (gridData[b].UserStories[us].ScheduleState == 'Accepted') bNode.US_Acpt_Count++;
-                                    }
-                                    for (d in gridData[b].Defects) {
-                                        if (gridData[b].Defects[d].State == 'Closed') {
-                                            bNode.DE_Clos_Count++;
-                                        } else if (gridData[b].Defects[d].Severity == 'Critical') {
-                                            bNode.DE_Crit_Count++;
-                                        } else if (gridData[b].Defects[d].Severity == 'High') {
-                                            bNode.DE_High_Count++;
-                                        } else {
-                                            bNode.DE_Clos_Count++; // Medium or cosmetic, not included in WI rate
+                                var existFilter = [];
+                                for (g in gridData) {
+                                    existFilter.push({
+                                        property : 'Name',
+                                        operator : '!=',
+                                        value    : g
+                                    });
+                                }
+            
+                                var releaseLoader = Ext.create('Rally.data.WsapiDataStore', {
+                                    model    : 'Release',
+                                    fetch    : ['Name'],
+                                    filters: [
+                                        { property: 'Name',        operator: 'contains', value: 'BNDL'                                        },
+                                        { property: 'ReleaseDate', operator: '>=',       value: App.down('#releaseWeek').getValue().StartDate },
+                                        { property: 'ReleaseDate', operator: '<=',       value: App.down('#releaseWeek').getValue().EndDate   }
+                                    ].concat(existFilter),
+                                    listeners : {
+                                        load : function(store, data) {
+                                            if (data && data.length) {
+                                                Ext.Array.each(data, function(r) {
+                                                    if (gridData[r.raw._refObjectName] == undefined) {
+                                                        gridData[r.raw._refObjectName] = {
+                                                            UserStories : [],
+                                                            Defects     : [],
+                                                            TestCases   : [],
+                                                            Notes       : []
+                                                        }
+                                                    }
+                                                });
+                                                releaseLoader.nextPage();
+                                            } else {
+                                                var bNode;
+                                                for (b in gridData) {
+                                                    bNode = {
+                                                        Project       : (b.match(/( - )(.+)(:)/)) ? b.match(/( - )(.+)(:)/)[2] : '',
+                                                        Bundle        : b,
+                                                        US_Acpt_Count : 0,
+                                                        DE_Crit_Count : 0,
+                                                        DE_High_Count : 0,
+                                                        DE_Clos_Count : 0,
+                                                        TC_Pass_Count : 0,
+                                                        Notes         : '',
+                                                        US_Store      : gridData[b].UserStories,
+                                                        DE_Store      : gridData[b].Defects,
+                                                        TC_Store      : gridData[b].TestCases
+                                                    };
+                                                    for (us in gridData[b].UserStories) {
+                                                        if (gridData[b].UserStories[us].ScheduleState == 'Accepted') bNode.US_Acpt_Count++;
+                                                    }
+                                                    for (d in gridData[b].Defects) {
+                                                        if (gridData[b].Defects[d].State == 'Closed') {
+                                                            bNode.DE_Clos_Count++;
+                                                        } else if (gridData[b].Defects[d].Severity == 'Critical') {
+                                                            bNode.DE_Crit_Count++;
+                                                        } else if (gridData[b].Defects[d].Severity == 'High') {
+                                                            bNode.DE_High_Count++;
+                                                        } else {
+                                                            bNode.DE_Clos_Count++; // Medium or cosmetic, not included in WI rate
+                                                        }
+                                                    }
+                                                    for (tc in gridData[b].TestCases) {
+                                                        if (gridData[b].TestCases[tc].LastVerdict == 'Pass') bNode.TC_Pass_Count++;
+                                                    }
+                                                    for (n in gridData[b].Notes) {
+                                                        bNode.Notes += '<div class="note">' + gridData[b].Notes[n] + '</div>';
+                                                    }
+                                                    bNode.WI_Acpt_Rate = ((bNode.US_Store.length + bNode.DE_Store.length) == 0) ? 'N/A' : parseFloat((bNode.US_Acpt_Count + bNode.DE_Clos_Count) / (bNode.US_Store.length + bNode.DE_Store.length));
+                                                    bNode.TC_Pass_Rate = (bNode.TC_Store.length == 0) ? 'N/A' : parseFloat(bNode.TC_Pass_Count / bNode.TC_Store.length);
+                                                    gridArray.push(bNode);
+                                                }
+                                                drawGrid();
+                                            }
                                         }
                                     }
-                                    for (tc in gridData[b].TestCases) {
-                                        if (gridData[b].TestCases[tc].LastVerdict == 'Pass') bNode.TC_Pass_Count++;
-                                    }
-                                    for (n in gridData[b].Notes) {
-                                        bNode.Notes += '<div class="note">' + gridData[b].Notes[n] + '</div>';
-                                    }
-                                    bNode.WI_Acpt_Rate = ((bNode.US_Store.length + bNode.DE_Store.length) == 0) ? 'N/A' : parseFloat((bNode.US_Acpt_Count + bNode.DE_Clos_Count) / (bNode.US_Store.length + bNode.DE_Store.length));
-                                    bNode.TC_Pass_Rate = (bNode.TC_Store.length == 0) ? 'N/A' : parseFloat(bNode.TC_Pass_Count / bNode.TC_Store.length);
-                                    gridArray.push(bNode);
-                                }
-                                drawGrid();
+                                });
+                                releaseLoader.loadPage(1);
                             });
                         });
             
                         function getData(data_type, callback) {
-                            console.log(App.down('#releaseWeek').getValue().StartDate);
-                            console.log(App.down('#releaseWeek').getValue().EndDate);
                             var loader = Ext.create('Rally.data.WsapiDataStore', {
                                 model: data_type,
                                 fetch: [
@@ -263,8 +298,12 @@
                                     align     : 'center',
                                     resizable : false,
                                     renderer  : function(val) {
-                                        var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
-                                        return '<div class="' + color + ' label">' + parseInt(val * 100) + '%<div>';
+                                        if (val == 'N/A') {
+                                            return val;
+                                        } else {
+                                            var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
+                                            return '<div class="' + color + ' label">' + parseInt(val * 100) + '%<div>';
+                                        }   
                                     }
                                 },{
                                     text      : 'Critical Defects',
