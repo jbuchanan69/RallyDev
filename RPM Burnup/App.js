@@ -1,4 +1,4 @@
-// RPM Burnup v0.6
+// RPM Burnup v0.6.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -286,8 +286,9 @@ Ext.define('CustomApp', {
             
             function getFutureTotals() {
                 xStart = Rally.util.DateTime.toIsoString(new Date());
-                xEnd   = App.down('#projectTree').getSelectionModel().getSelection()[0].raw.end;
-                if (!xStart || !xEnd || qDates[qDates.length - 1].Stories.length == 0) {
+                xEnd   = Rally.util.DateTime.toIsoString(App.down('#max_date').getValue());
+                
+                if (xStart > xEnd || qDates[qDates.length - 1].Stories.length == 0) {
                     drawChart();
                     return;
                 } //No future iterations in project range
