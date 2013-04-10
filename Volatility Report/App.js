@@ -1,4 +1,4 @@
-// Volatility Report v0.4
+// Volatility Report v0.6
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 var PANEL_WIDTH = 280;
@@ -60,8 +60,40 @@ Ext.define('CustomApp', {
                     width      : 300
                 }] 
             },{
-                width : 102,
+                id       : 'button_container',
+                width    : 210,
+                defaults : {
+                    margin : '0 0 0 5'
+                },
                 items : [{
+                    xtype     : 'button',
+                    text      : 'Export',
+                    id        : 'export_button',
+                    width     : 100,
+                    maxHeight : 23,
+                    handler   : function() {
+                        Ext.onReady(function() {
+                            Ext.getBody().mask('Exporting Chart...');
+                            setTimeout(function() {
+                                var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>';
+                                var base64   = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+                                var format   = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+                                var table    = document.getElementById('rally_grid');
+                                
+                                var excel_data = '<tr>';
+                                Ext.Array.each(table.innerHTML.match(/<span .*?x-column-header-text.*?>.*?<\/span>/gm), function(column_header_span) {
+                                    excel_data += (column_header_span.replace('span','td'));
+                                });
+                                excel_data += '</tr><tr></tr>';
+                                excel_data += table.innerHTML.replace(/\d+? ⇒ /g,'').replace(/<span .*?x-column-header-text.*?>.*?<\/span>/gm,'');
+                                
+                                var ctx = {worksheet: name || 'Worksheet', table: excel_data};
+                                window.location.href = 'data:application/vnd.ms-excel;base64,' + base64(format(template, ctx));
+                                Ext.getBody().unmask();
+                            }, 500);
+                        });
+                    }
+                },{
                     xtype     : 'button',
                     text      : 'Update',
                     width     : 100,
@@ -100,6 +132,10 @@ Ext.define('CustomApp', {
     launch: function() {
         Ext.getBody().mask('Loading...');
         App = this;
+        if (/*@cc_on!@*/0) { //Exporting to Excel not supported in IE
+            App.down('#export_button').hide();
+            App.down('#button_container').setWidth(105);
+        }
         App.rpmTree.init();
         App.teamTree.init();
         //Once all UI elements are ready, do an initial query
@@ -353,23 +389,26 @@ Ext.define('CustomApp', {
                                     gridArray.push(gridObj[o]);
                                 }
 
+                                var gridStore = Ext.create('Rally.data.custom.Store', {
+                                    data       : gridArray,
+                                    fields     : ['ARC','InitialState','CurrentState','_UnformattedID','Name','ObjectID','PlanEstimate','Team','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal','EstVsActHours'],
+                                    groupField : 'Team',
+                                    pageSize   : 10000,
+                                    sorters    : [
+                                        { property: 'Team',           direction: 'ASC'  },
+                                        { property: 'ARC',            direction: 'DESC' },
+                                        { property: '_UnformattedID', direction: 'ASC'  }
+                                    ]
+                                });
+
                                 //Render the grid to the viewport
                                 App.down('#viewport').removeAll();
                                 App.down('#viewport').add({
                                     xtype             : 'rallygrid',
+                                    id                : 'rally_grid',
                                     disableSelection  : true,
                                     showPagingToolbar : false,
-                                    store             : Ext.create('Rally.data.custom.Store', {
-                                        data       : gridArray,
-                                        fields     : ['ARC','InitialState','CurrentState','_UnformattedID','Name','ObjectID','PlanEstimate','Team','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal','EstVsActHours'],
-                                        groupField : 'Team',
-                                        pageSize   : 10000,
-                                        sorters    : [
-                                            { property: 'Team',           direction: 'ASC'  },
-                                            { property: 'ARC',            direction: 'DESC' },
-                                            { property: '_UnformattedID', direction: 'ASC'  }
-                                        ]
-                                    }),
+                                    store             : gridStore,
                                     features: [
                                         Ext.create('Ext.grid.feature.Grouping', {
                                             groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
@@ -407,7 +446,7 @@ Ext.define('CustomApp', {
                                         resizable : false,
                                         align     : 'center',
                                         renderer  : function(val, meta, record) {
-                                            return '<div class="label"><div class="align">' + Math.round(val * 100) + '%</div><div class="align">' + Math.round(record.get('TaskActualTotal')) + ' / ' + Math.round(record.get('TaskEstimateTotal')) + '</div></div>';
+                                            return '<div class="label"><span class="align">' + Math.round(val * 100) + '% </span><span class="align"> ' + Math.round(record.get('TaskActualTotal')) + ' / ' + Math.round(record.get('TaskEstimateTotal')) + '</span></div>';
                                         }
                                     },{
                                         text      : 'Remaining Hours',
