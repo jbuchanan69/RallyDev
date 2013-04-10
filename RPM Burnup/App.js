@@ -1,4 +1,4 @@
-// RPM Burnup v0.6.1
+// RPM Burnup v0.6.2
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -262,7 +262,7 @@ Ext.define('CustomApp', {
                 qDates.push(Rally.util.DateTime.toIsoString(xStart));
                 xStart = Ext.Date.add(xStart, Ext.Date.MILLI, queryDelta);
             }
-            if (xStart != xEnd) qDates.push(Rally.util.DateTime.toIsoString(xEnd));
+            // if (xStart != xEnd) qDates.push(Rally.util.DateTime.toIsoString(xEnd));
             var remaining = qDates.length;
             if (remaining == 0) {
                 drawChart();
@@ -343,7 +343,7 @@ Ext.define('CustomApp', {
                             if (iterPoints[iterHash[s.Iteration].Name] == undefined)
                                 iterPoints[iterHash[s.Iteration].Name] = {
                                     Points : 0,
-                                    Start  : Rally.util.DateTime.toIsoString(new Date(iterHash[s.Iteration].Start))
+                                    Start  : iterHash[s.Iteration].Start
                                 };
                             iterPoints[iterHash[s.Iteration].Name].Points += parseInt(s.PlanEstimate);
                         }
@@ -361,7 +361,7 @@ Ext.define('CustomApp', {
                         }
                     });
                     for (var d = qDates.length - 1; d > 0; d--) {
-                        if (qDates[d].Planned == qDates[d-1].Planned) qDates[d].Planned = 0;
+                        if (qDates[d].Planned == qDates[d - 1].Planned) qDates[d].Planned = null;
                         else break;
                     }
                     drawChart();
@@ -410,7 +410,7 @@ Ext.define('CustomApp', {
 
             function drawChart() {
                 for (var d = qDates.length - 1; d > 0; d--) {
-                    if (qDates[d].dateStr > Rally.util.DateTime.toIsoString(new Date())) qDates[d].Accepted = 0;
+                    if (qDates[d].dateStr > Rally.util.DateTime.toIsoString(new Date())) qDates[d].Accepted = null;
                     else break;
                 }
                 Ext.getBody().unmask();
