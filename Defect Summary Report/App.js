@@ -1,3 +1,6 @@
+// Defect Summary Report - Version 0.2
+// Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
+// Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
 		extend: 'Rally.app.App',
 		componentCls: 'app',
@@ -24,19 +27,11 @@ Ext.define('CustomApp', {
 		margins     : '5 0 0 0',
 		activeTab   : 0, // index or id
 		items:[
-			{ title: 'Defect Count by Severity'               },
-			{ title: 'Open Defect Maximum Target Dates'       },
-			{ title: 'Defect Trending (Critical/High & Open)' }
+			{ title: 'Open Defect Count by Severity'        },
+			{ title: 'Open Defect Maximum Target Dates'     },
+			{ title: 'Open Defect Trending (Critical/High)' }
 		],
 		listeners: {
-			resize : function() {
-				Ext.onReady(function() {
-					if (App.down('#chart')) {
-						App.down('#chart').setWidth(Ext.get('viewport').getWidth());
-						App.down('#chart').setHeight(Ext.get('viewport').getHeight() - 50);
-					}
-				});
-			},
 			beforetabchange: function(panel, newTab, oldTab) {
 				Ext.onReady(function() {
 					oldTab.removeAll();
@@ -54,6 +49,11 @@ Ext.define('CustomApp', {
 		Ext.getBody().mask('Initializing UI...');
 		App = this;
 		App.rpmTree.init();
+		App.down('#viewport').addListener('resize', function() {
+			if (App.down('#chart')) {
+				App.down('#chart').setHeight(Ext.get('viewport').getHeight() - 50);
+			}
+		});
 	},
 
 	rpmTree: {
@@ -181,38 +181,46 @@ Ext.define('CustomApp', {
 						if (data.length == 0) {
 							Ext.getBody().unmask();
 							App.down('#viewport').getActiveTab().removeAll();
+							Ext.Msg.alert('Error', 'There are no defects for the selected project.');
 						} else {
+							var openDefects = false;
 							Ext.Array.each(data, function(d) {
-								if (App.viewport.de_store[d.raw.Project] == undefined)
-									App.viewport.de_store[d.raw.Project] = {
-										TeamOID      : d.raw.Project,
-										DefectCounts : {
-											Critical : 0,
-											High     : 0,
-											Medium   : 0,
-											Cosmetic : 0,
-											None     : 0,
-											Total    : 0
-										},
-										TargetDates  : {
-											Critical : [],
-											High     : [],
-											Medium   : [],
-											Cosmetic : [],
-											None     : []
-										},
-										HistoricalCounts : []
-									};
-								//Defects
-								App.viewport.de_store[d.raw.Project].DefectCounts.Total++;
-								App.viewport.de_store[d.raw.Project].DefectCounts[d.raw.Severity]++;
-								//Target Dates
-								if (d.raw.State != 'Fixed'  &&
-									d.raw.State != 'Closed' &&
-									d.raw.TargetDate        &&
-									d.raw.Severity) App.viewport.de_store[d.raw.Project].TargetDates[d.raw.Severity].push(d.raw.TargetDate);
+								if (d.raw.State != 'Fixed' && d.raw.State != 'Closed') { //Open Defect
+									openDefects = true;
+									if (App.viewport.de_store[d.raw.Project] == undefined)
+										App.viewport.de_store[d.raw.Project] = {
+											TeamOID      : d.raw.Project,
+											DefectCounts : {
+												Critical : 0,
+												High     : 0,
+												Medium   : 0,
+												Cosmetic : 0,
+												None     : 0,
+												Total    : 0
+											},
+											TargetDates  : {
+												Critical : [],
+												High     : [],
+												Medium   : [],
+												Cosmetic : [],
+												None     : []
+											},
+											HistoricalCounts : []
+										};
+									App.viewport.de_store[d.raw.Project].DefectCounts.Total++;
+									App.viewport.de_store[d.raw.Project].DefectCounts[d.raw.Severity]++;
+									//Target Dates
+									if (d.raw.TargetDate && d.raw.Severity)
+										App.viewport.de_store[d.raw.Project].TargetDates[d.raw.Severity].push(d.raw.TargetDate);
+								}
 							});
-							getTeamNames();
+							if (openDefects) {
+								getTeamNames();
+							} else {
+								Ext.getBody().unmask();
+								App.down('#viewport').getActiveTab().removeAll();
+								Ext.Msg.alert('Error', 'There are no open defects for the selected project.');
+							}
 						}
 						
 					}
@@ -279,27 +287,16 @@ Ext.define('CustomApp', {
 						},{
 							property : '_ItemHierarchy',
 							value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
-						},{
-							property : 'State',
-							operator : '!=',
-							value    : 'Closed'
-						},{
-							property : 'State',
-							operator : '!=',
-							value    : 'Fixed'
-						},Rally.data.lookback.QueryFilter.or(
-							[{
-								property : 'Severity',
-								value    : 'Critical'
-							},{
-								property : 'Severity',
-								value    : 'High'
-							}]
-						)],
+						}],
 						listeners : {
 							load : function(store, data) {
 								Ext.Array.each(data, function(d) {
-									if (App.viewport.de_store[d.raw.Project]) App.viewport.de_store[d.raw.Project].HistoricalCounts[idx].count++;
+									if ((d.raw.Severity == 'Critical' ||
+										 d.raw.Severity == 'High')    &&
+										 d.raw.State != 'Fixed'       &&
+										 d.raw.State != 'Closed'      &&
+										 App.viewport.de_store[d.raw.Project])
+										App.viewport.de_store[d.raw.Project].HistoricalCounts[idx].count++;
 								});
 								if (!--remaining) App.viewport.draw();
 							}
