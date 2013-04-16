@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.2
+// Team Configuration Report - Version 0.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -27,8 +27,9 @@ Ext.define('CustomApp', {
 			flex   : 1
         },{
 			id     : 'settingsContainer',
-			height : 35,
+			height : 0, //35,
 			items  : [{
+				hidden     : true,
 				xtype      : 'rallymultiobjectpicker',
 				id         : 'tagPicker',
 				modelType  : 'Tag',
@@ -68,14 +69,20 @@ Ext.define('CustomApp', {
 		margins     : '5 0 0 0',
 		activeTab   : 0, // index or id
 		defaults    : {
-			autoScroll : true
+			autoScroll  : true
 		},
 		items       : [{
-			title : 'Unlinked User Stories',
+			title : 'Dashboard',
 			id    : 'tab0'
 		},{
-			title : 'Untagged User Stories',
+			title : 'Unlinked User Stories',
 			id    : 'tab1'
+		},{
+			title : 'Untagged User Stories',
+			id    : 'tab2'
+		},{
+			title : 'Unestimated User Stories',
+			id    : 'tab3'
 		}],
 		listeners   : {
 			tabchange : function() {
@@ -178,13 +185,25 @@ Ext.define('CustomApp', {
 
 	viewport: {
 		teamNameHash : {},
+		ensureTeamExists : function(team_name) {
+			if (App.viewport.teamCounts[team_name] == undefined) {
+				App.viewport.teamCounts[team_name] = {
+					TeamName         : team_name,
+					UnlinkedCount    : 0,
+					UntaggedCount    : 0,
+					UnestimatedCount : 0
+				};
+			}
+		},
 		update: function() {
 			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) return;
 			Ext.getBody().mask('Loading...');
-			App.viewport.rpmUserStories      = {};
-			App.viewport.taggedUserStories   = {};
-			App.viewport.untaggedUserStories = [];
-			App.viewport.unlinkedUserStories = [];
+			App.viewport.rpmUserStories         = {};
+			App.viewport.taggedUserStories      = {};
+			App.viewport.untaggedUserStories    = [];
+			App.viewport.unlinkedUserStories    = [];
+			App.viewport.unestimatedUserStories = [];
+			App.viewport.teamCounts             = {};
 			if (!App.tagOverride) {
 				App.down('#tagPicker').setValue(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.tags);
 				var title = '';
@@ -217,7 +236,9 @@ Ext.define('CustomApp', {
 					load : function(store, data) {
 						Ext.Array.each(data, function(s) {
 							s.raw.TeamName = App.teamNameHash[s.raw.Project];
+							App.viewport.ensureTeamExists(s.raw.TeamName);
 							App.viewport.rpmUserStories[s.raw.ObjectID] = s.raw;
+							if (!s.raw.PlanEstimate) App.viewport.unestimatedUserStories.push(s.raw);
 						});
 						onRPMStoriesLoaded();
 					}
@@ -234,8 +255,9 @@ Ext.define('CustomApp', {
 					Ext.getBody().unmask();
 					Ext.Msg.alert('Error', 'There are no tags associated with this project. Please select tag(s) from the menu to relate to the project.');
 					App.down('#viewport').getActiveTab().removeAll();
-					App.down('#tab0').setTitle('Unlinked User Stories');
-					App.down('#tab1').setTitle('Untagged User Stories');
+					App.down('#tab1').setTitle('Unlinked User Stories');
+					App.down('#tab2').setTitle('Untagged User Stories');
+					App.down('#tab3').setTitle('Unestimated User Stories');
 					return;
 				}
 
@@ -263,7 +285,9 @@ Ext.define('CustomApp', {
 						load : function(store, data) {
 							Ext.Array.each(data, function(s) {
 								s.raw.TeamName = App.teamNameHash[s.raw.Project];
+								App.viewport.ensureTeamExists(s.raw.TeamName);
 								App.viewport.taggedUserStories[s.raw.ObjectID] = s.raw;
+								if (!s.raw.PlanEstimate && App.viewport.rpmUserStories[s.raw.ObjectID] == undefined) App.viewport.unestimatedUserStories.push(s.raw);
 							});
 							onTaggedStoriesLoaded();
 						}
@@ -279,8 +303,9 @@ Ext.define('CustomApp', {
 						if (App.viewport.rpmUserStories[i] == undefined)
 							App.viewport.unlinkedUserStories.push(App.viewport.taggedUserStories[i]);
 					}
-					App.down('#tab0').setTitle('Unlinked User Stories (' + App.viewport.unlinkedUserStories.length + ')');
-					App.down('#tab1').setTitle('Untagged User Stories (' + App.viewport.untaggedUserStories.length + ')');
+					App.down('#tab1').setTitle('Unlinked User Stories ('    + App.viewport.unlinkedUserStories.length    + ')');
+					App.down('#tab2').setTitle('Untagged User Stories ('    + App.viewport.untaggedUserStories.length    + ')');
+					App.down('#tab3').setTitle('Unestimated User Stories (' + App.viewport.unestimatedUserStories.length + ')');
 					App.viewport.drawTab();
 				}
 
@@ -288,48 +313,135 @@ Ext.define('CustomApp', {
 		},
 
 		drawTab : function() {
+			if (App.down('#tagPicker').getValue().length == 0) return; //No tags associated
+
 			Ext.getBody().unmask();
-			var tab_number = App.down('#viewport').items.findIndex('id', App.down('#viewport').getActiveTab().id);
 			App.down('#viewport').getActiveTab().removeAll();
-			App.down('#viewport').getActiveTab().add({
-				xtype             : 'rallygrid',
-				disableSelection  : true,
-				showPagingToolbar : false,
-				store             : Ext.create('Rally.data.custom.Store', {
-					data       : (tab_number == 0) ? App.viewport.unlinkedUserStories : App.viewport.untaggedUserStories,
-					pageSize   : 1000000,
-					groupField : 'TeamName',
-					sorters    : [{
-						property  : 'TeamName',
-						direction : 'ASC'
-					}]
-				}),
-				features: [Ext.create('Ext.grid.feature.Grouping', {
-		        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
-		   		})],
-				columnCfgs : [{
-					text      : 'ID',
-					dataIndex : '_UnformattedID',
-					width     : 60,
-					renderer  : function(val, meta, record) {
-						return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('ObjectID') + '">US' + val + '</a>';
+			
+			[
+				function() {
+					var gridArray = [];
+					Ext.Array.each(App.viewport.unlinkedUserStories, function(i) {
+						App.viewport.teamCounts[i.TeamName].UnlinkedCount++;
+					});
+					Ext.Array.each(App.viewport.untaggedUserStories, function(i) {
+						App.viewport.teamCounts[i.TeamName].UntaggedCount++;
+					});
+					Ext.Array.each(App.viewport.unestimatedUserStories, function(i) {
+						App.viewport.teamCounts[i.TeamName].UnestimatedCount++;
+					});
+					for (t in App.viewport.teamCounts) {
+						gridArray.push(App.viewport.teamCounts[t]);
 					}
-				},{
-					text      : 'Name',
-					dataIndex : 'Name',
-					flex      : 1
-				},{
-					text      : 'Plan Estimate',
-					dataIndex : 'PlanEstimate',
-					width     : 90,
-					align     : 'center'
-				},{
-					text      : 'Schedule State',
-					dataIndex : 'ScheduleState',
-					width     : 90,
-					align     : 'center'
-				}]
-			});	
+					App.down('#viewport').getActiveTab().add({
+						xtype             : 'rallygrid',
+						disableSelection  : true,
+						showPagingToolbar : false,
+						store             : Ext.create('Rally.data.custom.Store', {
+							data    : gridArray,
+							sorters : [{
+								property  : 'TeamName',
+								direction : 'ASC'
+							}]
+						}),
+						features: [{
+				            ftype: 'summary'
+				        }],
+						columnCfgs : [{
+							text        : 'Team',
+							dataIndex   : 'TeamName',
+							flex        : 1,
+							minWidth    : 150,
+							summaryType : function() {
+								var retStr = '<b>' + ((App.down('#tagPicker').getValue().length > 1) ? 'Tags' : 'Tag') + ':</b> ';
+								Ext.Array.each(App.down('#tagPicker').getValue(), function(t) {
+									retStr += '[' + t._refObjectName + '] ';
+								});
+								return retStr;
+							}
+						},{
+							text      : 'Unlinked User Stories',
+							dataIndex : 'UnlinkedCount',
+							minWidth  : 100,
+							align     : 'center',
+							renderer  : function(val) {
+								return '<div class="' + valToColor(val) + ' label">' + val + '</div>';
+							}
+						},{
+							text      : 'Untagged User Stories',
+							dataIndex : 'UntaggedCount',
+							minWidth  : 100,
+							align     : 'center',
+							renderer  : function(val) {
+								return '<div class="' + valToColor(val) + ' label">' + val + '</div>';
+							}
+						},{
+							text      : 'Unestimated User Stories',
+							dataIndex : 'UnestimatedCount',
+							minWidth  : 100,
+							align     : 'center',
+							renderer  : function(val) {
+								return '<div class="' + valToColor(val) + ' label">' + val + '</div>';
+							}
+						}]
+					});
+
+					function valToColor(val) {
+						return (val == 0) ? 'green' : (val <= 5) ? 'yellow' : 'red';
+					}
+				},
+				function() {
+					drawDetailGrid(App.viewport.unlinkedUserStories);
+				},
+				function() {
+					drawDetailGrid(App.viewport.untaggedUserStories);
+				},
+				function() {
+					drawDetailGrid(App.viewport.unestimatedUserStories)
+				}
+			][App.down('#viewport').items.findIndex('id', App.down('#viewport').getActiveTab().id)]();
+
+			function drawDetailGrid(data) {
+				App.down('#viewport').getActiveTab().add({
+					xtype             : 'rallygrid',
+					disableSelection  : true,
+					showPagingToolbar : false,
+					store             : Ext.create('Rally.data.custom.Store', {
+						data       : data,
+						pageSize   : 1000000,
+						groupField : 'TeamName',
+						sorters    : [{
+							property  : 'TeamName',
+							direction : 'ASC'
+						}]
+					}),
+					features: [Ext.create('Ext.grid.feature.Grouping', {
+			        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
+			   		})],
+					columnCfgs : [{
+						text      : 'ID',
+						dataIndex : '_UnformattedID',
+						width     : 60,
+						renderer  : function(val, meta, record) {
+							return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('ObjectID') + '">US' + val + '</a>';
+						}
+					},{
+						text      : 'Name',
+						dataIndex : 'Name',
+						flex      : 1
+					},{
+						text      : 'Plan Estimate',
+						dataIndex : 'PlanEstimate',
+						width     : 90,
+						align     : 'center'
+					},{
+						text      : 'Schedule State',
+						dataIndex : 'ScheduleState',
+						width     : 90,
+						align     : 'center'
+					}]
+				});	
+			}
 		}
 	}
 });

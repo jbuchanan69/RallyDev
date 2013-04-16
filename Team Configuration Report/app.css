@@ -1,1 +1,14 @@
-.x-tree-icon { display: none !important; }
+.x-tree-icon { display    : none !important; }
+.green       { background : #C6EFCE;         }
+.red         { background : #FFC7CE;         }
+.yellow      { background : #FFEB9C;         }
+
+.label {
+	display       : inline-block;
+	padding       : 2px;
+	width         : 88px;
+	height        : 20px;
+	line-height   : 16px;
+	text-align    : center;
+	border-radius : 3px;
+}
