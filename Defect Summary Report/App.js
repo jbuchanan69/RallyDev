@@ -1,4 +1,4 @@
-// Defect Summary Report - Version 0.2
+// Defect Summary Report - Version 0.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -14,10 +14,10 @@ Ext.define('CustomApp', {
 		margins : '5 0 0 0'
 	},
 	items: [{
-		title   : 'Project',
+		title   : 'Tag',
 		region  : 'west',
-		width   : 300,
-		id      : 'rpmTreeContainer', 
+		width   : 250,
+		id      : 'tagTreeContainer', 
 		layout  : 'fit'
 	},{
 		xtype       : 'tabpanel',
@@ -48,7 +48,7 @@ Ext.define('CustomApp', {
 	launch: function() {
 		Ext.getBody().mask('Initializing UI...');
 		App = this;
-		App.rpmTree.init();
+		App.tagTree.init();
 		App.down('#viewport').addListener('resize', function() {
 			if (App.down('#chart')) {
 				App.down('#chart').setHeight(Ext.get('viewport').getHeight() - 50);
@@ -56,40 +56,82 @@ Ext.define('CustomApp', {
 		});
 	},
 
-	rpmTree: {
+	tagTree: {
 		init: function() {
-			Ext.create('Rally.data.WsapiDataStore', {
-				autoLoad: true,
-				model: 'PortfolioItem/Initiative',
-				fetch: ['Children','LeafStoryCount','Name','ObjectID'],
-				listeners: {
-					load: function(store, data) {
-						if (data.length == 0) {
-							App.removeAll();
-							Ext.getBody().unmask();
-							Ext.Msg.alert('Error', '<div class="error">This app must be ran within a context which features Initiative Portfolio Items.<br />Please change your project scope and try again.</div>');
-							return;
-						} else {
-							var roots = [];
-							Ext.Array.each(data, function(i) {
-								roots.push({
-									name : i.raw.Name,
-									text : '<span class="count">' + i.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + i.raw.Name + '</span>',
-									id   : i.raw.ObjectID,
-									leaf : i.raw.Children == undefined || i.raw.Children.length == 0
+			var usedTagsFilter = [],
+				tagUseRates    = [],
+				roots          = [],
+				queryCount     = 0;
+			Ext.create('Rally.data.lookback.SnapshotStore', {
+				autoLoad : true,
+				pageSize : 1000000,
+				fetch    : ['Tags','State'],
+				hydrate  : ['State'],
+				filters: [{
+					property : '__At',
+					value    : 'current'
+				},{
+					property : '_TypeHierarchy',
+					value    : 'Defect'
+				},{
+					property : 'Tags',
+					operator : '!=',
+					value    : null
+				}],
+				listeners : {
+					load : function(store, data) {
+						Ext.Array.each(data, function(d, k) {
+							if (d.raw.State != 'Fixed' && d.raw.State != 'Closed') {
+								Ext.Array.each(d.raw.Tags, function(t) {
+									if (tagUseRates[t] == undefined) {
+										tagUseRates[t] = 0;
+										usedTagsFilter.push({
+											property : 'ObjectID',
+											value    : t
+										});
+									}
+									tagUseRates[t]++;
 								});
-							});
-							roots.sort(function(a, b) {
-								return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
-							});
-							drawTree(roots);
-						}
+								if (usedTagsFilter.length >= 50 || k == data.length - 1) {
+									queryCount++;
+									loadTagDetails();
+									usedTagsFilter = [];
+								}
+							}
+						});
 					}
 				}
 			});
 
-			function drawTree(roots) {
-				App.down('#rpmTreeContainer').add({
+			function loadTagDetails() {
+				Ext.create('Rally.data.WsapiDataStore', {
+					autoLoad  : true,
+					model     : 'Tag',
+					fetch     : ['ObjectID','Name'],
+					filters   : Rally.data.QueryFilter.or(usedTagsFilter),
+					listeners : {
+						load : function(store, data) {
+							Ext.Array.each(data, function(t) {
+								roots.push({
+									name : t.raw.Name,
+									text : '<span class="count">' + tagUseRates[t.raw.ObjectID] + '</span> - ' + t.raw.Name,
+									id   : t.raw.ObjectID,
+									leaf : true
+								});
+							});
+							if (!--queryCount) {
+								roots.sort(function(a, b) {
+									return a['name'].toLowerCase() > b['name'].toLowerCase() ? 1 : a['name'].toLowerCase() < b['name'].toLowerCase() ? -1 : 0;
+								});
+								drawTree();
+							}
+						}
+					}
+				});
+			}
+
+			function drawTree() {
+				App.down('#tagTreeContainer').add({
 					xtype        : 'treepanel',
 					store        : Ext.create('Ext.data.TreeStore', {
 						root: {
@@ -97,53 +139,13 @@ Ext.define('CustomApp', {
 							children: roots
 						}
 					}),
-					id           : 'rpmTree',
+					id           : 'tagTree',
 					rootVisible  : false,
 					margin       : '-1 0 0 0',
 					border       : 0,
 					listeners    : {
 						added    : function() {
 							Ext.getBody().unmask();
-						},
-						beforeitemexpand: function(node) {
-							if (node.hasChildNodes() == false) { // Child nodes have not been populated yet
-								getChildren('Rollup', function(rollup_children) {
-									getChildren('Feature', function(feature_children) {
-										var children = [];
-										Ext.Array.each(rollup_children.concat(feature_children), function(c) {
-											children.push({
-												name : c.raw.Name,
-												text : '<span class="count">' + c.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + c.raw.Name + '</span>',
-												id   : c.raw.ObjectID,
-												leaf : c.raw.Children == undefined || c.raw.Children.length == 0
-											});
-										});
-										Ext.Array.each(children.sort(function(a, b) {
-											return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
-										}), function(n) {
-											node.appendChild(n);
-										});
-									});
-								});
-							}
-
-							function getChildren(child_type, callback) {
-								Ext.create('Rally.data.WsapiDataStore', {
-									autoLoad: true,
-									model: 'PortfolioItem/' + child_type,
-									filters: [{
-										property: 'Parent.ObjectID',
-										value: node.raw.id
-									}],
-									fetch: ['Children','LeafStoryCount','Name','ObjectID'],
-									listeners: {
-										load: function(store, data) {
-											callback(data);
-										}
-									}
-								});
-							}
-
 						},
 						selectionchange: function() {
 							App.viewport.update();
@@ -158,6 +160,10 @@ Ext.define('CustomApp', {
 	viewport: {
 		de_store : {},
 		update   : function() {
+			var selectedTags = [];
+			Ext.Array.each(App.down('#tagTree').getSelectionModel().getSelection(), function(t) {
+				selectedTags.push(t.raw.id);
+			});
 			Ext.getBody().mask('Loading...');
 			App.viewport.de_store = {};
 			//Get all defects which descend from the selected RPM level
@@ -173,8 +179,9 @@ Ext.define('CustomApp', {
 					property : '_TypeHierarchy',
 					value    : 'Defect'
 				},{
-					property : '_ItemHierarchy',
-					value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+					property : 'Tags',
+					operator : 'in',
+					value    : selectedTags
 				}],
 				listeners : {
 					load : function(store, data) {
@@ -285,8 +292,9 @@ Ext.define('CustomApp', {
 							property : '_TypeHierarchy',
 							value    : 'Defect'
 						},{
-							property : '_ItemHierarchy',
-							value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+							property : 'Tags',
+							operator : 'in',
+							value    : selectedTags
 						}],
 						listeners : {
 							load : function(store, data) {
@@ -319,38 +327,77 @@ Ext.define('CustomApp', {
 							High     : App.viewport.de_store[p].DefectCounts.High,
 							Medium   : App.viewport.de_store[p].DefectCounts.Medium,
 							Cosmetic : App.viewport.de_store[p].DefectCounts.Cosmetic,
-							None     : App.viewport.de_store[p].DefectCounts.None
+							None     : App.viewport.de_store[p].DefectCounts.None,
+							Total    : App.viewport.de_store[p].DefectCounts.Total
 						});
 					}
 					drawGrid([{
 						text      : 'Team',
 						dataIndex : 'Team',
-						flex      : 1
+						flex      : 1,
+						summaryType : function() {
+							return '<b>Sum:</b>';
+						}
 					},{
 						text      : 'Critical',
 						dataIndex : 'Critical',
 						width     : 100,
-						align     : 'center'
+						align     : 'center',
+						summaryType     : 'sum',
+						summaryRenderer : function(val) {
+							return '<b>' + val + '</b>';
+						}
 					},{
 						text      : 'High',
 						dataIndex : 'High',
 						width     : 100,
-						align     : 'center'
+						align     : 'center',
+						summaryType     : 'sum',
+						summaryRenderer : function(val) {
+							return '<b>' + val + '</b>';
+						}
 					},{
 						text      : 'Medium',
 						dataIndex : 'Medium',
 						width     : 100,
-						align     : 'center'
+						align     : 'center',
+						summaryType     : 'sum',
+						summaryRenderer : function(val) {
+							return '<b>' + val + '</b>';
+						}
 					},{
 						text      : 'Cosmetic',
 						dataIndex : 'Cosmetic',
 						width     : 100,
-						align     : 'center'
+						align     : 'center',
+						summaryType     : 'sum',
+						summaryRenderer : function(val) {
+							return '<b>' + val + '</b>';
+						}
 					},{
 						text      : 'None',
 						dataIndex : 'None',
 						width     : 100,
-						align     : 'center'
+						align     : 'center',
+						summaryType     : 'sum',
+						summaryRenderer : function(val) {
+							return '<b>' + val + '</b>';
+						}
+					},{
+						text      : 'Total',
+						dataIndex : 'Total',
+						width     : 100,
+						align     : 'center',
+						style     : {
+							fontWeight : 'bold'
+						},
+						renderer  : function(val) {
+							return '<b>' + val + '</b>';
+						},
+						summaryType     : 'sum',
+						summaryRenderer : function(val) {
+							return '<b>' + val + '</b>';
+						}
 					}]);
 				},
 				function() {
@@ -438,6 +485,9 @@ Ext.define('CustomApp', {
 							direction : 'ASC'
 						}]
 					}),
+					features: [{
+			            ftype: 'summary'
+			        }],
 					columnCfgs : columns
 				});	
 			}

@@ -1,23 +1,21 @@
-#rpmTree .x-grid-cell-inner .count {
-	width            : 25px;
-	border           : 1px solid #B7841F;
-	display          : inline-block;
-	text-align       : center;
-	font-size        : 9px;
-	height           : 13px;
-	line-height      : 12px;
-	background       : #FFE993;
-	border-radius    : 3px;
-	background-image : linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-	background-image : -o-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-	background-image : -moz-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-	background-image : -webkit-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-	background-image : -ms-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-	background-image : -webkit-gradient(
-		linear,
-		left bottom,
-		left top,
-		color-stop(0.4, rgb(255,218,117)),
-		color-stop(0.85, rgb(255,255,186))
-	);
+.count {
+	width         : 25px;
+	margin-left   : 3px; 
+	border        : 1px solid #B7841F;
+	display       : inline-block;
+	text-align    : center;
+	font-size     : 9px;
+	height        : 13px;
+	line-height   : 12px;
+	border-radius : 3px;
+	background    : #ffff99;
+	background    : -moz-linear-gradient(top,  #ffff99 0%, #ffd46f 100%);
+	background    : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffff99), color-stop(100%,#ffd46f));
+	background    : -webkit-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : -o-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : -ms-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : linear-gradient(to bottom,  #ffff99 0%,#ffd46f 100%);
+	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
 }
+
+.x-tree-icon { display: none !important; }
