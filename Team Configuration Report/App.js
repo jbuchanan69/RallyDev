@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.3
+// Team Configuration Report - Version 0.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -21,6 +21,36 @@ Ext.define('CustomApp', {
             align : 'stretch',
             pack  : 'start',
         },
+        tools:[{
+		    type:'save',
+		    tooltip: 'Save CSV',
+		    handler: function(event, toolEl, panel){
+		    	Ext.onReady(function() {
+		    		if (/*@cc_on!@*/0) { //Exporting to Excel not supported in IE
+			            Ext.Msg.alert('Error', 'Exporting to CSV is not supported in Internet Explorer. Please switch to a different browser and try again.');
+			        } else if (App.down('#rally_grid')) {
+                    	Ext.getBody().mask('Exporting Chart...');
+	                    setTimeout(function() {
+	                        var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>';
+	                        var base64   = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+	                        var format   = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+	                        var table    = document.getElementById('rally_grid');
+	                        
+	                        var excel_data = '<tr>';
+	                        Ext.Array.each(table.innerHTML.match(/<span .*?x-column-header-text.*?>.*?<\/span>/gm), function(column_header_span) {
+	                            excel_data += (column_header_span.replace('span','td'));
+	                        });
+	                        excel_data += '</tr>';
+	                        excel_data += table.innerHTML.replace(/<span .*?x-column-header-text.*?>.*?<\/span>/gm,'').replace(/<div class="x-grid-group-title".*?>.*?<\/div>/gm,'').replace(/___/gm,' ');
+
+	                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
+	                        window.location.href = 'data:application/vnd.ms-excel;base64,' + base64(format(template, ctx));
+	                        Ext.getBody().unmask();
+	                    }, 500);
+                    }
+                });
+		    }
+		}],
         items: [{
 			id     : 'rpmTreeContainer',
 			layout : 'fit',
@@ -85,6 +115,11 @@ Ext.define('CustomApp', {
 			id    : 'tab3'
 		}],
 		listeners   : {
+			beforetabchange: function(panel, newTab, oldTab) {
+				Ext.onReady(function() {
+					oldTab.removeAll();
+				});
+			},
 			tabchange : function() {
 				Ext.onReady(function() {
 					App.viewport.drawTab();
@@ -185,6 +220,7 @@ Ext.define('CustomApp', {
 
 	viewport: {
 		teamNameHash : {},
+		iterNameHash : {},
 		ensureTeamExists : function(team_name) {
 			if (App.viewport.teamCounts[team_name] == undefined) {
 				App.viewport.teamCounts[team_name] = {
@@ -204,6 +240,7 @@ Ext.define('CustomApp', {
 			App.viewport.unlinkedUserStories    = [];
 			App.viewport.unestimatedUserStories = [];
 			App.viewport.teamCounts             = {};
+			App.viewport.undetailedIters        = [];
 			if (!App.tagOverride) {
 				App.down('#tagPicker').setValue(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.tags);
 				var title = '';
@@ -216,7 +253,7 @@ Ext.define('CustomApp', {
 			Ext.create('Rally.data.lookback.SnapshotStore', {
 				autoLoad : true,
 				pageSize : 1000000,
-				fetch    : ['Name','ObjectID','_UnformattedID','PlanEstimate','ScheduleState','Project'],
+				fetch    : ['Name','ObjectID','_UnformattedID','PlanEstimate','ScheduleState','Project','Iteration'],
 				hydrate  : ['ScheduleState'],
 				filters  : [{
 					property : '__At',
@@ -236,9 +273,14 @@ Ext.define('CustomApp', {
 					load : function(store, data) {
 						Ext.Array.each(data, function(s) {
 							s.raw.TeamName = App.teamNameHash[s.raw.Project];
+							s.raw.ex_TeamName = App.teamNameHash[s.raw.Project];
 							App.viewport.ensureTeamExists(s.raw.TeamName);
 							App.viewport.rpmUserStories[s.raw.ObjectID] = s.raw;
-							if (!s.raw.PlanEstimate) App.viewport.unestimatedUserStories.push(s.raw);
+							if (s.raw.Iteration && !s.raw.PlanEstimate) App.viewport.unestimatedUserStories.push(s.raw);
+							if (s.raw.Iteration && App.viewport.iterNameHash[s.raw.Iteration] == undefined) {
+								App.viewport.iterNameHash[s.raw.Iteration] = '';
+								App.viewport.undetailedIters.push(s.raw.Iteration);
+							}
 						});
 						onRPMStoriesLoaded();
 					}
@@ -253,7 +295,7 @@ Ext.define('CustomApp', {
 				//Make sure tags exist
 				if (tagFilter.length == 0) {
 					Ext.getBody().unmask();
-					Ext.Msg.alert('Error', 'There are no tags associated with this project. Please select tag(s) from the menu to relate to the project.');
+					Ext.Msg.alert('Error', '<div style="text-align:center">There are no tags associated with this project.<br /><a href="https://rally1.rallydev.com/slm/portfolioitem/initiative/edit.sp?oid=' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id + '">ADD TAGS HERE</a></div>');
 					App.down('#viewport').getActiveTab().removeAll();
 					App.down('#tab1').setTitle('Unlinked User Stories');
 					App.down('#tab2').setTitle('Untagged User Stories');
@@ -264,7 +306,7 @@ Ext.define('CustomApp', {
 				Ext.create('Rally.data.lookback.SnapshotStore', {
 					autoLoad : true,
 					pageSize : 1000000,
-					fetch    : ['Name','ObjectID','_UnformattedID','PlanEstimate','ScheduleState','Project'],
+					fetch    : ['Name','ObjectID','_UnformattedID','PlanEstimate','ScheduleState','Project','Iteration'],
 					hydrate  : ['ScheduleState'],
 					filters  : [{
 						property : '__At',
@@ -285,9 +327,14 @@ Ext.define('CustomApp', {
 						load : function(store, data) {
 							Ext.Array.each(data, function(s) {
 								s.raw.TeamName = App.teamNameHash[s.raw.Project];
+								s.raw.ex_TeamName = App.teamNameHash[s.raw.Project];
 								App.viewport.ensureTeamExists(s.raw.TeamName);
 								App.viewport.taggedUserStories[s.raw.ObjectID] = s.raw;
-								if (!s.raw.PlanEstimate && App.viewport.rpmUserStories[s.raw.ObjectID] == undefined) App.viewport.unestimatedUserStories.push(s.raw);
+								if (s.raw.Iteration && !s.raw.PlanEstimate && App.viewport.rpmUserStories[s.raw.ObjectID] == undefined) App.viewport.unestimatedUserStories.push(s.raw);
+								if (s.raw.Iteration && App.viewport.iterNameHash[s.raw.Iteration] == undefined) {
+									App.viewport.iterNameHash[s.raw.Iteration] = '';
+									App.viewport.undetailedIters.push(s.raw.Iteration);
+								}
 							});
 							onTaggedStoriesLoaded();
 						}
@@ -306,9 +353,45 @@ Ext.define('CustomApp', {
 					App.down('#tab1').setTitle('Unlinked User Stories ('    + App.viewport.unlinkedUserStories.length    + ')');
 					App.down('#tab2').setTitle('Untagged User Stories ('    + App.viewport.untaggedUserStories.length    + ')');
 					App.down('#tab3').setTitle('Unestimated User Stories (' + App.viewport.unestimatedUserStories.length + ')');
-					App.viewport.drawTab();
+					if (App.viewport.undetailedIters.length > 0) {
+						getIterDetail();
+					} else {
+						App.viewport.drawTab();
+					}
 				}
 
+				function getIterDetail() {
+					var filter = [];
+					var remaining = 0;
+					Ext.Array.each(App.viewport.undetailedIters, function(i, k) {
+						filter.push({
+							property : 'ObjectID',
+							value    : i
+						});
+						if (filter.length >= 50 || k == App.viewport.undetailedIters.length - 1) {
+							remaining++;
+							runIterQuery();
+							filter = [];
+						}
+					});
+					
+					function runIterQuery() {
+						Ext.create('Rally.data.WsapiDataStore', {
+							autoLoad  : true,
+							model     : 'Iteration',
+							fetch     : ['ObjectID','Name'],
+							filters   : Rally.data.QueryFilter.or(filter),
+							listeners : {
+								load : function(store, data) {
+									Ext.Array.each(data, function(i) {
+										App.viewport.iterNameHash[i.raw.ObjectID] = i.raw._refObjectName;
+									});
+									if (!--remaining) App.viewport.drawTab();
+								}
+							}
+						});
+					}	
+				}
 			}
 		},
 
@@ -335,11 +418,13 @@ Ext.define('CustomApp', {
 					}
 					App.down('#viewport').getActiveTab().add({
 						xtype             : 'rallygrid',
+						id                : 'rally_grid',
 						disableSelection  : true,
 						showPagingToolbar : false,
 						store             : Ext.create('Rally.data.custom.Store', {
-							data    : gridArray,
-							sorters : [{
+							data     : gridArray,
+							pageSize : 1000000,
+							sorters  : [{
 								property  : 'TeamName',
 								direction : 'ASC'
 							}]
@@ -404,6 +489,7 @@ Ext.define('CustomApp', {
 			function drawDetailGrid(data) {
 				App.down('#viewport').getActiveTab().add({
 					xtype             : 'rallygrid',
+					id                : 'rally_grid',
 					disableSelection  : true,
 					showPagingToolbar : false,
 					store             : Ext.create('Rally.data.custom.Store', {
@@ -419,6 +505,13 @@ Ext.define('CustomApp', {
 			        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
 			   		})],
 					columnCfgs : [{
+						text      : 'Team Name',
+						dataIndex : 'ex_TeamName',
+						hidden    : true,
+						renderer  : function(val) {
+							return val.replace(/ /g,'___');
+						}
+					},{
 						text      : 'ID',
 						dataIndex : '_UnformattedID',
 						width     : 60,
@@ -439,6 +532,14 @@ Ext.define('CustomApp', {
 						dataIndex : 'ScheduleState',
 						width     : 90,
 						align     : 'center'
+					},{
+						text      : 'Iteration',
+						dataIndex : 'Iteration',
+						width     : 180,
+						align     : 'center',
+						renderer  : function(val) {
+							return App.viewport.iterNameHash[val];
+						}
 					}]
 				});	
 			}
