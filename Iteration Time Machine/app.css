@@ -1,0 +1,11 @@
+.filter {
+	display: inline-block;
+	margin: 5px;
+}
+#rightToolbar .filter {
+	float: right;
+}
+#iterBox {
+	margin: auto;
+}
+

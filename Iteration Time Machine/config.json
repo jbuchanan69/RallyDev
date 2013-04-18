@@ -1,0 +1,11 @@
+{
+    "name": "iteration_time_machine_v2.0",
+    "className": "CustomApp",
+    "sdk": "2.0p4",
+    "javascript": [
+        "App.js"
+    ],
+    "css": [
+        "app.css"
+    ]
+}
