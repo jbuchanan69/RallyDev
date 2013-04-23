@@ -1,0 +1,13 @@
+#toolbar {
+	margin: 5px;
+}
+
+#releasePicker-inputCell,
+#iterPicker-inputCell {
+	width: 160px;
+	margin: 0 5px;
+}
+
+.activeButton {
+	background: #666;
+}

@@ -1,0 +1,11 @@
+{
+		"name": "CWTSD",
+		"className": "CustomApp",
+		"sdk": "2.0p5",
+		"javascript": [
+				"App.js"
+		],
+		"css": [
+				"app.css"
+		]
+}
