@@ -1,4 +1,4 @@
-// Completion Date Variance Report - Version 0.1
+// Completion Date Variance Report - Version 0.1.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -118,7 +118,7 @@ Ext.define('CustomApp', {
 			Ext.create('Rally.data.WsapiDataStore', {
 	            autoLoad: true,
 	            model: 'PortfolioItem/Initiative',
-	            fetch: ['Children','LeafStoryCount','Name','ObjectID','PortfolioItemTypeName','UnEstimatedLeafStoryCount','LeafStoryCount','LeafStoryPlanEstimateTotal','AcceptedLeafStoryPlanEstimateTotal','PlannedEndDate','ActualEndDate'],
+	            fetch: ['Children','LeafStoryCount','Name','ObjectID','PortfolioItemTypeName','UnEstimatedLeafStoryCount','LeafStoryCount','LeafStoryPlanEstimateTotal','AcceptedLeafStoryPlanEstimateTotal','PlannedStartDate','PlannedEndDate','ActualEndDate'],
 	            listeners: {
 	                load: function(store, data) {
 	                    if (data.length == 0) {
@@ -138,6 +138,7 @@ Ext.define('CustomApp', {
 									ueCnt  : i.raw.UnEstimatedLeafStoryCount,
 									peCnt  : i.raw.LeafStoryPlanEstimateTotal,
 									aPeCnt : i.raw.AcceptedLeafStoryPlanEstimateTotal,
+									pStart : i.raw.PlannedStartDate,
 									pEnd   : i.raw.PlannedEndDate,
 									aEnd   : i.raw.ActualEndDate,
 									leaf   : i.raw.Children == undefined || i.raw.Children.length == 0
@@ -187,6 +188,7 @@ Ext.define('CustomApp', {
 												ueCnt  : c.raw.UnEstimatedLeafStoryCount,
 												peCnt  : c.raw.LeafStoryPlanEstimateTotal,
 												aPeCnt : c.raw.AcceptedLeafStoryPlanEstimateTotal,
+												pStart : c.raw.PlannedStartDate,
 												pEnd   : c.raw.PlannedEndDate,
 												aEnd   : c.raw.ActualEndDate,
 												leaf   : c.raw.Children == undefined || c.raw.Children.length == 0
@@ -214,7 +216,7 @@ Ext.define('CustomApp', {
 										property: 'Parent.ObjectID',
 										value: node.raw.id
 									}],
-									fetch: ['Children','LeafStoryCount','Name','ObjectID','PortfolioItemTypeName','UnEstimatedLeafStoryCount','LeafStoryCount','LeafStoryPlanEstimateTotal','AcceptedLeafStoryPlanEstimateTotal','PlannedEndDate','ActualEndDate'],
+									fetch: ['Children','LeafStoryCount','Name','ObjectID','PortfolioItemTypeName','UnEstimatedLeafStoryCount','LeafStoryCount','LeafStoryPlanEstimateTotal','AcceptedLeafStoryPlanEstimateTotal','PlannedStartDate','PlannedEndDate','ActualEndDate'],
 									listeners: {
 										load: function(store, data) {
 											callback(data);
@@ -300,13 +302,15 @@ Ext.define('CustomApp', {
 							type              : Ext.Array.indexOf(['Initiative', 'Roll up', 'Feature'], i.raw.type) + ' - ' + i.raw.type,
 							estimateRate      : (i.raw.sCnt == 0) ? 0 : parseFloat(1 - (i.raw.ueCnt / i.raw.sCnt)),
 							totalPoints       : i.raw.peCnt,
+							storyCount        : i.raw.sCnt,
 							completeRate      : (i.raw.peCnt == 0) ? 0 : parseFloat(i.raw.aPeCnt / i.raw.peCnt),
 							remainingPoints   : parseFloat(i.raw.peCnt - i.raw.aPeCnt),
 							avgVelocity       : velocities[i.raw.id],
 							sprintsToComplete : sprintsToComplete,
 							forecastComp      : forecastComp,
 							sprintVariance    : sprintVariance,
-							compDeadline      : i.raw.pEnd,
+							plannedStartDate  : i.raw.pStart,
+							plannedEndDate    : i.raw.pEnd
 						}
 					}
 				});
@@ -394,6 +398,15 @@ Ext.define('CustomApp', {
 							return Ext.util.Format.number(val * 100, '0,0.0') + '%'
 						}
 					},{
+						text      : 'User Story Count',
+						dataIndex : 'storyCount',
+						width     : fixedColWidth,
+						align     : 'center',
+						resizable : false,
+						renderer  : function(val) {
+							return Ext.util.Format.number(val, '0,000')
+						}
+					},{
 						text      : 'Total Plan Estimate',
 						dataIndex : 'totalPoints',
 						width     : fixedColWidth,
@@ -449,6 +462,20 @@ Ext.define('CustomApp', {
 							}
 						}
 					},{
+						text      : 'Planned Start Date',
+						dataIndex : 'plannedStartDate',
+						width     : fixedColWidth,
+						align     : 'center',
+						resizable : false,
+						renderer  : function(val, meta) {
+							if (val == null) {
+								meta.tdCls = 'grey';
+								return 'N/A'
+							} else {
+								return val.substring(0,10)
+							}
+						}
+					},{
 						text      : 'Forecasted Completion Date',
 						dataIndex : 'forecastComp',
 						width     : fixedColWidth,
@@ -466,8 +493,8 @@ Ext.define('CustomApp', {
 							}
 						}
 					},{
-						text      : 'Completion Deadline',
-						dataIndex : 'compDeadline',
+						text      : 'Planned End Date',
+						dataIndex : 'plannedEndDate',
 						width     : fixedColWidth,
 						align     : 'center',
 						resizable : false,
