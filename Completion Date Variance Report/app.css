@@ -1,0 +1,30 @@
+#rpmTree .x-grid-cell-inner .count {
+	width         : 25px;
+	border        : 1px solid #B7841F;
+	display       : inline-block;
+	text-align    : center;
+	font-size     : 9px;
+	height        : 13px;
+	line-height   : 12px;
+	border-radius : 3px;
+	margin-right  : 4px;
+	background    : #ffff99;
+	background    : -moz-linear-gradient(top,  #ffff99 0%, #ffd46f 100%);
+	background    : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffff99), color-stop(100%,#ffd46f));
+	background    : -webkit-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : -o-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : -ms-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+	background    : linear-gradient(to bottom,  #ffff99 0%,#ffd46f 100%);
+	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
+}
+
+.x-tree-icon { display    : none    !important }
+
+.green       { background : #C6EFCE !important }
+.red         { background : #FFC7CE !important }
+.yellow      { background : #FFEB9C !important }
+.grey        { background : #E7EBEE !important }
+
+td .x-grid-cell {
+	vertical-align: middle !important;
+}
