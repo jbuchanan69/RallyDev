@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.4
+// Team Configuration Report - Version 0.4.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -404,6 +404,11 @@ Ext.define('CustomApp', {
 			[
 				function() {
 					var gridArray = [];
+					for (t in App.viewport.teamCounts) { //Reset counts to zero before redrawing the tab
+						App.viewport.teamCounts[t].UnlinkedCount    = 0;
+						App.viewport.teamCounts[t].UntaggedCount    = 0;
+						App.viewport.teamCounts[t].UnestimatedCount = 0;
+					}
 					Ext.Array.each(App.viewport.unlinkedUserStories, function(i) {
 						App.viewport.teamCounts[i.TeamName].UnlinkedCount++;
 					});
