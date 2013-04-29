@@ -1,0 +1,13 @@
+.green       { background : #C6EFCE !important }
+.red         { background : #FFC7CE !important }
+.yellow      { background : #FFEB9C !important }
+.grey        { background : #E7EBEE !important }
+
+td .x-grid-cell {
+	vertical-align: middle !important;
+}
+
+.half {
+	display : inline-block;
+	width   : 80px;
+}
