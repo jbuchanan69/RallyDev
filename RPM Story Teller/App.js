@@ -1,4 +1,4 @@
-// RPM Story Teller - Version 1.2.1
+// RPM Story Teller - Version 1.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -195,9 +195,13 @@ Ext.define('CustomApp', {
 								{ property: 'PlanEstimate', direction: 'DESC' }
 							]
 						}),
-						features: [Ext.create('Ext.grid.feature.Grouping', {
-				        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
-				   		})],
+						features: [{
+							id: 'group',
+				            ftype: 'groupingsummary',
+				            groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})',
+				            hideGroupedHeader: true,
+				            enableGroupingMenu: false
+						}],
 						columnCfgs: [{
 							text      : 'ID',
 							dataIndex : '_UnformattedID',
@@ -219,25 +223,41 @@ Ext.define('CustomApp', {
 								return ['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'][val];
 							}
 						},{
-							text      : 'Plan Estimate',
-							dataIndex : 'PlanEstimate',
-							width     : 75,
-							align     : 'center'
+							text            : 'Plan Estimate',
+							dataIndex       : 'PlanEstimate',
+							width           : 75,
+							align           : 'center',
+							summaryType     : 'sum',
+							summaryRenderer : function(val, data, idx) {
+				                return '<b>' + val + '</b>';
+				            }
 						},{
-							text      : 'Estimated Task Hours',
-							dataIndex : 'TaskEstimateTotal',
-							width     : 75,
-							align     : 'center'
+							text            : 'Estimated Task Hours',
+							dataIndex       : 'TaskEstimateTotal',
+							width           : 75,
+							align           : 'center',
+							summaryType     : 'sum',
+							summaryRenderer : function(val, data, idx) {
+				                return '<b>' + val + '</b>';
+				            }
 						},{
-							text      : 'Actual Task Hours',
-							dataIndex : 'TaskActualTotal',
-							width     : 75,
-							align     : 'center'
+							text            : 'Actual Task Hours',
+							dataIndex       : 'TaskActualTotal',
+							width           : 75,
+							align           : 'center',
+							summaryType     : 'sum',
+							summaryRenderer : function(val, data, idx) {
+				                return '<b>' + val + '</b>';
+				            }
 						},{
-							text      : 'Remaining Task Hours',
-							dataIndex : 'TaskRemainingTotal',
-							width     : 75,
-							align     : 'center'
+							text            : 'Remaining Task Hours',
+							dataIndex       : 'TaskRemainingTotal',
+							width           : 75,
+							align           : 'center',
+							summaryType     : 'sum',
+							summaryRenderer : function(val, data, idx) {
+				                return '<b>' + val + '</b>';
+				            }
 						}]
 					});
 				});
