@@ -1,4 +1,4 @@
-// Defect Summary Report - Version 0.3
+// Defect Summary Report - Version 0.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -48,7 +48,26 @@ Ext.define('CustomApp', {
 	launch: function() {
 		Ext.getBody().mask('Initializing UI...');
 		App = this;
-		App.tagTree.init();
+		App.viewableProjects = [];
+
+		var loader = Ext.create('Rally.data.WsapiDataStore', {
+			model     : 'Project',
+			fetch     : ['ObjectID'],
+			listeners : {
+				load : function(store, data) {
+					if (data && data.length) {
+						Ext.Array.each(data, function(i) {
+							App.viewableProjects.push(i.raw.ObjectID);
+						});
+						loader.nextPage();
+					} else {
+						App.tagTree.init();
+					}
+				}
+			}
+		});
+		loader.loadPage(1);
+		
 		App.down('#viewport').addListener('resize', function() {
 			if (App.down('#chart')) {
 				App.down('#chart').setHeight(Ext.get('viewport').getHeight() - 50);
@@ -77,6 +96,10 @@ Ext.define('CustomApp', {
 					property : 'Tags',
 					operator : '!=',
 					value    : null
+				},{
+					property : 'Project',
+					operator : 'in',
+					value    : App.viewableProjects
 				}],
 				listeners : {
 					load : function(store, data) {
@@ -182,6 +205,10 @@ Ext.define('CustomApp', {
 					property : 'Tags',
 					operator : 'in',
 					value    : selectedTags
+				},{
+					property : 'Project',
+					operator : 'in',
+					value    : App.viewableProjects
 				}],
 				listeners : {
 					load : function(store, data) {
@@ -295,6 +322,10 @@ Ext.define('CustomApp', {
 							property : 'Tags',
 							operator : 'in',
 							value    : selectedTags
+						},{
+							property : 'Project',
+							operator : 'in',
+							value    : App.viewableProjects
 						}],
 						listeners : {
 							load : function(store, data) {
