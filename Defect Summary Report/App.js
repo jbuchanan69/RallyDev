@@ -1,4 +1,4 @@
-// Defect Summary Report - Version 0.4
+// Defect Summary Report - Version 0.5
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -18,7 +18,37 @@ Ext.define('CustomApp', {
 		region  : 'west',
 		width   : 250,
 		id      : 'tagTreeContainer', 
-		layout  : 'fit'
+		layout  : 'fit',
+		tools:[{
+		    type:'save',
+		    tooltip: 'Save CSV',
+		    handler: function(event, toolEl, panel){
+		    	Ext.onReady(function() {
+		    		if (/*@cc_on!@*/0) { //Exporting to Excel not supported in IE
+			            Ext.Msg.alert('Error', 'Exporting to CSV is not supported in Internet Explorer. Please switch to a different browser and try again.');
+			        } else if (App.down('#rally_grid') && App.down('#viewport').items.findIndex('id', App.down('#viewport').getActiveTab().id) == 0) {
+                    	Ext.getBody().mask('Exporting Chart...');
+	                    setTimeout(function() {
+	                        var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>';
+	                        var base64   = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+	                        var format   = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+	                        var table    = document.getElementById('rally_grid');
+	                        
+	                        var excel_data = '<tr>';
+	                        Ext.Array.each(table.innerHTML.match(/<span .*?x-column-header-text.*?>.*?<\/span>/gm), function(column_header_span) {
+	                            excel_data += (column_header_span.replace('span','td'));
+	                        });
+	                        excel_data += '</tr>';
+	                        excel_data += table.innerHTML.replace(/<span .*?x-column-header-text.*?>.*?<\/span>/gm,'').replace(/<div class="x-grid-group-title".*?>.*?<\/div>/gm,'').replace(/___/gm,' ');
+
+	                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
+	                        window.location.href = 'data:application/vnd.ms-excel;base64,' + base64(format(template, ctx));
+	                        Ext.getBody().unmask();
+	                    }, 500);
+                    }
+                });
+		    }
+		}],
 	},{
 		xtype       : 'tabpanel',
 		id          : 'viewport',
@@ -104,7 +134,7 @@ Ext.define('CustomApp', {
 				listeners : {
 					load : function(store, data) {
 						Ext.Array.each(data, function(d, k) {
-							if (d.raw.State != 'Fixed' && d.raw.State != 'Closed') {
+							if (d.raw.State != 'Closed') {
 								Ext.Array.each(d.raw.Tags, function(t) {
 									if (tagUseRates[t] == undefined) {
 										tagUseRates[t] = 0;
@@ -219,7 +249,7 @@ Ext.define('CustomApp', {
 						} else {
 							var openDefects = false;
 							Ext.Array.each(data, function(d) {
-								if (d.raw.State != 'Fixed' && d.raw.State != 'Closed') { //Open Defect
+								if (d.raw.State != 'Closed') { //Open Defect
 									openDefects = true;
 									if (App.viewport.de_store[d.raw.Project] == undefined)
 										App.viewport.de_store[d.raw.Project] = {
@@ -332,8 +362,7 @@ Ext.define('CustomApp', {
 								Ext.Array.each(data, function(d) {
 									if ((d.raw.Severity == 'Critical' ||
 										 d.raw.Severity == 'High')    &&
-										 d.raw.State != 'Fixed'       &&
-										 d.raw.State != 'Closed'      &&
+										 d.raw.State    != 'Closed'   &&
 										 App.viewport.de_store[d.raw.Project])
 										App.viewport.de_store[d.raw.Project].HistoricalCounts[idx].count++;
 								});
@@ -506,6 +535,7 @@ Ext.define('CustomApp', {
 				App.down('#viewport').getActiveTab().removeAll();
 				App.down('#viewport').getActiveTab().add({
 					xtype             : 'rallygrid',
+					id                : 'rally_grid',
 					disableSelection  : true,
 					showPagingToolbar : false,
 					store             : Ext.create('Rally.data.custom.Store', {
