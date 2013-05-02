@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.4.1
+// Team Configuration Report - Version 0.5
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -105,7 +105,7 @@ Ext.define('CustomApp', {
 			title : 'Dashboard',
 			id    : 'tab0'
 		},{
-			title : 'Unlinked User Stories',
+			title : 'Unparented User Stories',
 			id    : 'tab1'
 		},{
 			title : 'Untagged User Stories',
@@ -129,26 +129,27 @@ Ext.define('CustomApp', {
 	}],
 
 	launch: function() {
-		Ext.getBody().mask('Initializing UI...');
+		Ext.getBody().mask('Initializing UI');
 		App = this;
-		App.viewableProjects = [];
-		App.teamNameHash     = [];
+		App.viewableTeams = [];
+		App.teamNameHash  = [];
 		//Find out what projects I have access to
-		var teamLoader = Ext.create('Rally.data.WsapiDataStore', {
+		var loader = Ext.create('Rally.data.WsapiDataStore', {
 			model     : 'Project',
 			fetch     : ['ObjectID','Name'],
 			listeners : {
 				load : function(store, data) {
-					Ext.Array.each(data, function(p) {
-						App.viewableProjects.push(p.raw.ObjectID);
-						App.teamNameHash[p.raw.ObjectID] = p.raw.Name;
-					});
+					if (data && data.length) {
+						Ext.Array.each(data, function(p) {
+							App.viewableTeams.push(p.raw.ObjectID);
+							App.teamNameHash[p.raw.ObjectID] = p.raw.Name;
+						});
+						loader.nextPage();
+					}
 				}
 			}
 		});
-		teamLoader.loadPages({
-			callback: App.rpmTree.init
-		})
+		loader.loadPage(1);
 	},
 
 	rpmTree: {
@@ -156,12 +157,13 @@ Ext.define('CustomApp', {
 			Ext.create('Rally.data.WsapiDataStore', {
 	            autoLoad: true,
 	            model: 'PortfolioItem/Initiative',
-	            filters : [{
-	            	property : 'LeafStoryCount',
-	            	operator : '>',
-	            	value    : 0
-	            }],
-	            fetch: ['Children','LeafStoryCount','Name','ObjectID','Tags'],
+	            fetch: [
+	            	'Children',
+	            	'LeafStoryCount',
+	            	'Name',
+	            	'ObjectID',
+	            	'Tags'
+	            ],
 	            listeners: {
 	                load: function(store, data) {
 	                    if (data.length == 0) {
@@ -174,9 +176,9 @@ Ext.define('CustomApp', {
 							Ext.Array.each(data, function(i) {
 		                    	roots.push({
 		                    		name : i.raw.Name,
-		                    		text : ' ' + i.raw.Name,
+		                    		text : '<span class="count">' + i.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + i.raw.Name + '</span>',
 		                    		id   : i.raw.ObjectID,
-		                    		leaf : true,
+		                    		leaf : i.raw.Children == undefined || i.raw.Children.length == 0,
 		                    		tags : i.raw.Tags
 		                    	});
 		                    });
@@ -191,332 +193,204 @@ Ext.define('CustomApp', {
 
 			function drawTree(roots) {
 				App.down('#rpmTreeContainer').add({
-					xtype       : 'treepanel',
-					store       : Ext.create('Ext.data.TreeStore', {
+					xtype        : 'treepanel',
+					store        : Ext.create('Ext.data.TreeStore', {
 						root: {
 							expanded: true,
 							children: roots
 						}
 					}),
-					id          : 'rpmTree',
-					rootVisible : false,
-					margin      : '-1 0 0 0',
-					border      : 0,
-					listeners   : {
-						added : function() {
+					id           : 'rpmTree',
+					rootVisible  : false,
+					margin       : '-1 0 0 0',
+					border       : 0,
+					listeners    : {
+						added    : function() {
 							Ext.getBody().unmask();
 						},
+						beforeitemexpand: function(node) {
+							if (node.hasChildNodes() == false) { // Child nodes have not been populated yet
+								getChildren('Rollup', function(rollup_children) {
+									getChildren('Feature', function(feature_children) {
+										var children = [];
+										Ext.Array.each(rollup_children.concat(feature_children), function(c) {
+											children.push({
+					                    		name : c.raw.Name,
+					                    		text : '<span class="count">' + c.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + c.raw.Name + '</span>',
+					                    		id   : c.raw.ObjectID,
+					                    		leaf : c.raw.Children == undefined || c.raw.Children.length == 0,
+					                    		tags : c.raw.Tags
+					                    	});
+										});
+										Ext.Array.each(children.sort(function(a, b) {
+											return a['name'] > b['name'] ? 1 : a['name'] < b['name'] ? -1 : 0;
+										}), function(n) {
+											node.appendChild(n);
+										});
+									});
+								});
+							}
+
+							function getChildren(child_type, callback) {
+								Ext.create('Rally.data.WsapiDataStore', {
+									autoLoad : true,
+									model    : 'PortfolioItem/' + child_type,
+									filters  : [{
+										property : 'Parent.ObjectID',
+										value    : node.raw.id
+									}],
+									fetch     : ['Children','LeafStoryCount','Name','ObjectID','Tags'],
+									listeners : {
+										load: function(store, data) {
+											callback(data);
+										}
+									}
+								});
+							}
+
+						},
 						selectionchange: function() {
-							App.tagOverride = false;
-							App.down('#tagPicker').fireEvent('change');
 							App.viewport.update();
 						}
 					}
 				});
 				
 			}
-		}
+		}()
 	},
 
 	viewport: {
-		teamNameHash : {},
-		iterNameHash : {},
-		ensureTeamExists : function(team_name) {
-			if (App.viewport.teamCounts[team_name] == undefined) {
-				App.viewport.teamCounts[team_name] = {
-					TeamName         : team_name,
-					UnlinkedCount    : 0,
-					UntaggedCount    : 0,
-					UnestimatedCount : 0
-				};
-			}
-		},
 		update: function() {
-			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) return;
-			Ext.getBody().mask('Loading...');
-			App.viewport.rpmUserStories         = {};
-			App.viewport.taggedUserStories      = {};
-			App.viewport.untaggedUserStories    = [];
-			App.viewport.unlinkedUserStories    = [];
-			App.viewport.unestimatedUserStories = [];
-			App.viewport.teamCounts             = {};
-			App.viewport.undetailedIters        = [];
-			if (!App.tagOverride) {
-				App.down('#tagPicker').setValue(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.tags);
-				var title = '';
-            	Ext.Array.each(App.down('#tagPicker').getValue(), function(t) {
-            		title += '[' + t._refObjectName + '] '
-            	});
-            	App.down('#tagPicker').setRawValue(title);
+			Ext.getBody().mask('Loading');
+			App.viewport.rpmStories    = {};
+			App.viewport.taggedStories = {};
+
+			var tags = [];
+			Ext.Array.each(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.tags, function(t) {
+				tags.push(t.ObjectID);
+			});
+			if (tags.length == 0) {
+				Ext.Msg.alert('Error', 'There are no tags associated with the selected RPM project.');
+				App.down('#viewport').getActiveTab().removeAll();
+				Ext.getBody().unmask();
+				return;
 			}
-			//Get all descendant stories from the selected RPM level
-			Ext.create('Rally.data.lookback.SnapshotStore', {
-				autoLoad : true,
-				pageSize : 1000000,
-				fetch    : ['Name','ObjectID','_UnformattedID','PlanEstimate','ScheduleState','Project','Iteration'],
-				hydrate  : ['ScheduleState'],
-				filters  : [{
+
+			getStories(
+				{
+					property : '_ItemHierarchy',
+					value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+				},
+				App.viewport.rpmStories,
+				function () {
+					getStories(
+						{
+							property : 'Tags',
+							operator : 'in',
+							value    : tags
+						},
+						App.viewport.taggedStories,
+						App.viewport.doStats
+					);
+				}
+			);
+
+			function getStories(extraFilter, storyObj, callback) {
+				var filters = [{
 					property : '__At',
 					value    : 'current'
 				},{
 					property : '_TypeHierarchy',
 					value    : 'HierarchicalRequirement'
 				},{
-					property : '_ItemHierarchy',
-					value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].data.id
+					property : 'Children',
+					value    : null
 				},{
 					property : 'Project',
 					operator : 'in',
-					value    : App.viewableProjects
-				}],
-				listeners : {
-					load : function(store, data) {
-						Ext.Array.each(data, function(s) {
-							s.raw.TeamName = App.teamNameHash[s.raw.Project];
-							s.raw.ex_TeamName = App.teamNameHash[s.raw.Project];
-							App.viewport.ensureTeamExists(s.raw.TeamName);
-							App.viewport.rpmUserStories[s.raw.ObjectID] = s.raw;
-							if (s.raw.Iteration && !s.raw.PlanEstimate) App.viewport.unestimatedUserStories.push(s.raw);
-							if (s.raw.Iteration && App.viewport.iterNameHash[s.raw.Iteration] == undefined) {
-								App.viewport.iterNameHash[s.raw.Iteration] = '';
-								App.viewport.undetailedIters.push(s.raw.Iteration);
-							}
-						});
-						onRPMStoriesLoaded();
-					}
-				}
-			});
-
-			function onRPMStoriesLoaded() {
-				var tagFilter = [];
-				Ext.Array.each(App.down('#tagPicker').getValue(), function(t) {
-					tagFilter.push(t.ObjectID)
-				});
-				//Make sure tags exist
-				if (tagFilter.length == 0) {
-					Ext.getBody().unmask();
-					Ext.Msg.alert('Error', '<div style="text-align:center">There are no tags associated with this project.<br /><a href="https://rally1.rallydev.com/slm/portfolioitem/initiative/edit.sp?oid=' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id + '">ADD TAGS HERE</a></div>');
-					App.down('#viewport').getActiveTab().removeAll();
-					App.down('#tab1').setTitle('Unlinked User Stories');
-					App.down('#tab2').setTitle('Untagged User Stories');
-					App.down('#tab3').setTitle('Unestimated User Stories');
-					return;
-				}
-
+					value    : App.viewableTeams
+				}];
+				filters.push(extraFilter);
 				Ext.create('Rally.data.lookback.SnapshotStore', {
 					autoLoad : true,
 					pageSize : 1000000,
-					fetch    : ['Name','ObjectID','_UnformattedID','PlanEstimate','ScheduleState','Project','Iteration'],
+					fetch    : ['_UnformattedID','Name','PlanEstimate','ScheduleState','Project','Tags'],
 					hydrate  : ['ScheduleState'],
-					filters  : [{
-						property : '__At',
-						value    : 'current'
-					},{
-						property : '_TypeHierarchy',
-						value    : 'HierarchicalRequirement'
-					},{
-						property : 'Project',
-						operator : 'in',
-						value    : App.viewableProjects
-					},{
-						property : 'Tags',
-						operator : 'in',
-						value    : tagFilter
-					}],
+					filters  : filters,
 					listeners : {
-						load : function(store, data) {
-							Ext.Array.each(data, function(s) {
-								s.raw.TeamName = App.teamNameHash[s.raw.Project];
-								s.raw.ex_TeamName = App.teamNameHash[s.raw.Project];
-								App.viewport.ensureTeamExists(s.raw.TeamName);
-								App.viewport.taggedUserStories[s.raw.ObjectID] = s.raw;
-								if (s.raw.Iteration && !s.raw.PlanEstimate && App.viewport.rpmUserStories[s.raw.ObjectID] == undefined) App.viewport.unestimatedUserStories.push(s.raw);
-								if (s.raw.Iteration && App.viewport.iterNameHash[s.raw.Iteration] == undefined) {
-									App.viewport.iterNameHash[s.raw.Iteration] = '';
-									App.viewport.undetailedIters.push(s.raw.Iteration);
-								}
+						load : function(store, data, success) {
+							Ext.Array.each(data, function(i) {
+								i.raw.Team               = App.teamNameHash[i.raw.Project];
+								i.raw.ScheduleState      = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], i.raw.ScheduleState);
+								storyObj[i.raw.ObjectID] = i.raw;
 							});
-							onTaggedStoriesLoaded();
+							callback();
 						}
 					}
 				});
-
-				function onTaggedStoriesLoaded() {
-					for (i in App.viewport.rpmUserStories) {
-						if (App.viewport.taggedUserStories[i] == undefined)
-							App.viewport.untaggedUserStories.push(App.viewport.rpmUserStories[i]);
-					}
-					for (i in App.viewport.taggedUserStories) {
-						if (App.viewport.rpmUserStories[i] == undefined)
-							App.viewport.unlinkedUserStories.push(App.viewport.taggedUserStories[i]);
-					}
-					App.down('#tab1').setTitle('Unlinked User Stories ('    + App.viewport.unlinkedUserStories.length    + ')');
-					App.down('#tab2').setTitle('Untagged User Stories ('    + App.viewport.untaggedUserStories.length    + ')');
-					App.down('#tab3').setTitle('Unestimated User Stories (' + App.viewport.unestimatedUserStories.length + ')');
-					if (App.viewport.undetailedIters.length > 0) {
-						getIterDetail();
-					} else {
-						App.viewport.drawTab();
-					}
-				}
-
-				function getIterDetail() {
-					var filter = [];
-					var remaining = 0;
-					Ext.Array.each(App.viewport.undetailedIters, function(i, k) {
-						filter.push({
-							property : 'ObjectID',
-							value    : i
-						});
-						if (filter.length >= 50 || k == App.viewport.undetailedIters.length - 1) {
-							remaining++;
-							runIterQuery();
-							filter = [];
-						}
-					});
-					
-					function runIterQuery() {
-						Ext.create('Rally.data.WsapiDataStore', {
-							autoLoad  : true,
-							model     : 'Iteration',
-							fetch     : ['ObjectID','Name'],
-							filters   : Rally.data.QueryFilter.or(filter),
-							listeners : {
-								load : function(store, data) {
-									Ext.Array.each(data, function(i) {
-										App.viewport.iterNameHash[i.raw.ObjectID] = i.raw._refObjectName;
-									});
-									if (!--remaining) App.viewport.drawTab();
-								}
-							}
-						});
-					}	
-				}
 			}
 		},
 
-		drawTab : function() {
-			if (App.down('#tagPicker').getValue().length == 0) return; //No tags associated
-
-			Ext.getBody().unmask();
-			App.down('#viewport').getActiveTab().removeAll();
-			
-			[
-				function() {
-					var gridArray = [];
-					for (t in App.viewport.teamCounts) { //Reset counts to zero before redrawing the tab
-						App.viewport.teamCounts[t].UnlinkedCount    = 0;
-						App.viewport.teamCounts[t].UntaggedCount    = 0;
-						App.viewport.teamCounts[t].UnestimatedCount = 0;
-					}
-					Ext.Array.each(App.viewport.unlinkedUserStories, function(i) {
-						App.viewport.teamCounts[i.TeamName].UnlinkedCount++;
-					});
-					Ext.Array.each(App.viewport.untaggedUserStories, function(i) {
-						App.viewport.teamCounts[i.TeamName].UntaggedCount++;
-					});
-					Ext.Array.each(App.viewport.unestimatedUserStories, function(i) {
-						App.viewport.teamCounts[i.TeamName].UnestimatedCount++;
-					});
-					for (t in App.viewport.teamCounts) {
-						gridArray.push(App.viewport.teamCounts[t]);
-					}
-					App.down('#viewport').getActiveTab().add({
-						xtype             : 'rallygrid',
-						id                : 'rally_grid',
-						disableSelection  : true,
-						showPagingToolbar : false,
-						store             : Ext.create('Rally.data.custom.Store', {
-							data     : gridArray,
-							pageSize : 1000000,
-							sorters  : [{
-								property  : 'TeamName',
-								direction : 'ASC'
-							}]
-						}),
-						features: [{
-				            ftype: 'summary'
-				        }],
-						columnCfgs : [{
-							text        : 'Team',
-							dataIndex   : 'TeamName',
-							flex        : 1,
-							minWidth    : 150,
-							summaryType : function() {
-								var retStr = '<b>' + ((App.down('#tagPicker').getValue().length > 1) ? 'Tags' : 'Tag') + ':</b> ';
-								Ext.Array.each(App.down('#tagPicker').getValue(), function(t) {
-									retStr += '[' + t._refObjectName + '] ';
-								});
-								return retStr;
-							}
-						},{
-							text      : 'Unlinked User Stories',
-							dataIndex : 'UnlinkedCount',
-							minWidth  : 100,
-							align     : 'center',
-							renderer  : function(val) {
-								return '<div class="' + valToColor(val) + ' label">' + val + '</div>';
-							}
-						},{
-							text      : 'Untagged User Stories',
-							dataIndex : 'UntaggedCount',
-							minWidth  : 100,
-							align     : 'center',
-							renderer  : function(val) {
-								return '<div class="' + valToColor(val) + ' label">' + val + '</div>';
-							}
-						},{
-							text      : 'Unestimated User Stories',
-							dataIndex : 'UnestimatedCount',
-							minWidth  : 100,
-							align     : 'center',
-							renderer  : function(val) {
-								return '<div class="' + valToColor(val) + ' label">' + val + '</div>';
-							}
-						}]
-					});
-
-					function valToColor(val) {
-						return (val == 0) ? 'green' : (val <= 5) ? 'yellow' : 'red';
-					}
-				},
-				function() {
-					drawDetailGrid(App.viewport.unlinkedUserStories);
-				},
-				function() {
-					drawDetailGrid(App.viewport.untaggedUserStories);
-				},
-				function() {
-					drawDetailGrid(App.viewport.unestimatedUserStories)
+		doStats: function() {
+			App.viewport.untaggedStories    = [];
+			App.viewport.unparentedStories  = [];
+			App.viewport.unestimatedStories = [];
+			App.viewport.dashboardData      = [];
+			App.viewport.dashboardDataObj   = {};
+			for (i in App.viewport.rpmStories) {
+				if (App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project] == undefined) {
+					App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project] = {
+						Team               : App.viewport.rpmStories[i].Team,
+						unparentedStories  : 0,
+						untaggedStories    : 0,
+						unestimatedStories : 0
+					};
 				}
-			][App.down('#viewport').items.findIndex('id', App.down('#viewport').getActiveTab().id)]();
+				if (App.viewport.rpmStories[i].PlanEstimate == 0) {
+					App.viewport.unestimatedStories.push(App.viewport.rpmStories[i]);
+					App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project].unestimatedStories++;
+				}
+				if (App.viewport.taggedStories[i] === undefined) {
+					App.viewport.untaggedStories.push(App.viewport.rpmStories[i]);
+					App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project].untaggedStories++;
+				}
+			}
+			for (i in App.viewport.taggedStories) {
+				if (App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project] == undefined) {
+					App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project] = {
+						teamName           : App.viewport.taggedStories[i].Team,
+						unparentedStories  : 0,
+						untaggedStories    : 0,
+						unestimatedStories : 0
+					};
+				}
+				if (App.viewport.rpmStories[i] === undefined) {
+					App.viewport.unparentedStories.push(App.viewport.taggedStories[i]);
+					App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unparentedStories++;
+					if (App.viewport.taggedStories[i].PlanEstimate == 0) {
+						App.viewport.unestimatedStories.push(App.viewport.taggedStories[i]);
+						App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unestimatedStories++;
+					}
+				}
+			}
+			for (i in App.viewport.dashboardDataObj) {
+				if (App.viewport.dashboardDataObj[i].Team != undefined)
+					App.viewport.dashboardData.push(App.viewport.dashboardDataObj[i]);
+			}
+			App.down('#tab1').setTitle('Unparented User Stories (' + App.viewport.unparentedStories.length + ')');
+			App.down('#tab2').setTitle('Untagged User Stories (' + App.viewport.untaggedStories.length + ')');
+			App.down('#tab3').setTitle('Unestimated User Stories (' + App.viewport.unestimatedStories.length + ')');
+			App.viewport.drawTab();
+		},
 
-			function drawDetailGrid(data) {
-				App.down('#viewport').getActiveTab().add({
-					xtype             : 'rallygrid',
-					id                : 'rally_grid',
-					disableSelection  : true,
-					showPagingToolbar : false,
-					store             : Ext.create('Rally.data.custom.Store', {
-						data       : data,
-						pageSize   : 1000000,
-						groupField : 'TeamName',
-						sorters    : [{
-							property  : 'TeamName',
-							direction : 'ASC'
-						}]
-					}),
-					features: [Ext.create('Ext.grid.feature.Grouping', {
-			        	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
-			   		})],
-					columnCfgs : [{
-						text      : 'Team Name',
-						dataIndex : 'ex_TeamName',
-						hidden    : true,
-						renderer  : function(val) {
-							return val.replace(/ /g,'___');
-						}
-					},{
+		drawTab: function() {
+			Ext.getBody().unmask();
+			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) return;
+			var tab_number = App.down('#viewport').items.findIndex('id', App.down('#viewport').getActiveTab().id);
+			if (tab_number > 0) {
+				drawGrid(
+					[null, App.viewport.unparentedStories, App.viewport.untaggedStories, App.viewport.unestimatedStories][tab_number], true,
+					[{
 						text      : 'ID',
 						dataIndex : '_UnformattedID',
 						width     : 60,
@@ -526,27 +400,98 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Name',
 						dataIndex : 'Name',
-						flex      : 1
+						flex      : 1,
+						minWidth  : 150
 					},{
-						text      : 'Plan Estimate',
+						text      : 'Plan Est',
 						dataIndex : 'PlanEstimate',
-						width     : 90,
+						width     : 80,
 						align     : 'center'
 					},{
-						text      : 'Schedule State',
+						text      : 'State',
 						dataIndex : 'ScheduleState',
-						width     : 90,
-						align     : 'center'
-					},{
-						text      : 'Iteration',
-						dataIndex : 'Iteration',
-						width     : 180,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val) {
-							return App.viewport.iterNameHash[val];
+							return ['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'][val];
 						}
 					}]
-				});	
+				);
+			} else {
+				drawGrid(App.viewport.dashboardData, false, [{
+					text      : 'Team',
+					dataIndex : 'Team',
+					flex      : 1,
+					minWidth  : 200
+				},{
+					text      : 'Unparented User Stories',
+					dataIndex : 'unparentedStories',
+					width     : 140,
+					align     : 'center',
+					renderer  : function(val, meta) {
+						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						return val;
+					}
+				},{
+					text      : 'Untagged User Stories',
+					dataIndex : 'untaggedStories',
+					width     : 140,
+					align     : 'center',
+					renderer  : function(val, meta) {
+						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						return val;
+					}
+				},{
+					text      : 'Unestimated User Stories',
+					dataIndex : 'unestimatedStories',
+					width     : 140,
+					align     : 'center',
+					renderer  : function(val, meta) {
+						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						return val;
+					}
+				}]);
+			}
+
+			function drawGrid(gridArray, groupTeams, columns) {
+				console.log(gridArray.sort(function(a, b) {
+					return a.Team > b.Team;
+				}));
+				App.down('#viewport').getActiveTab().removeAll();
+				App.down('#viewport').getActiveTab().add({
+					xtype             : 'rallygrid',
+					id                : 'rally_grid',
+					disableSelection  : true,
+					showPagingToolbar : false,
+					store             : Ext.create('Rally.data.custom.Store', {
+						data       : gridArray,
+						// fields     : ['Team','unparentedStories','untaggedStories','unestimatedStories'],
+						// groupField : (groupTeams) ? 'Team' : null,
+						pageSize   : 1000000,
+						sorters    : [{
+							property  : 'Team',
+							direction : 'ASC'
+						},{
+							property  : 'ScheduleState',
+							direction : 'ASC'
+						}]
+					}),
+					// features: [Ext.create('Ext.grid.feature.Grouping', {
+				 //       	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
+				 //   	})],
+					columnCfgs : columns
+				});
+				var tags_string = '<b>Tags:</b>';
+				Ext.Array.each(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.tags, function(t) {
+					tags_string += ' [' + t.Name + ']';
+				});
+				App.down('#viewport').getActiveTab().add({
+					xtype : 'container',
+					html  : tags_string,
+					style : {
+						margin : '5px 0 5px 5px'
+					}
+				});
 			}
 		}
 	}
