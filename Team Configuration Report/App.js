@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.5
+// Team Configuration Report - Version 0.5.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -13,7 +13,7 @@ Ext.define('CustomApp', {
 		margins : '5 5 0 0'
 	},
 	items: [{
-		title   : 'Initiative',
+		title   : 'Project',
 		region  : 'west',
 		width   : 315,
 		layout: {
@@ -454,9 +454,6 @@ Ext.define('CustomApp', {
 			}
 
 			function drawGrid(gridArray, groupTeams, columns) {
-				console.log(gridArray.sort(function(a, b) {
-					return a.Team > b.Team;
-				}));
 				App.down('#viewport').getActiveTab().removeAll();
 				App.down('#viewport').getActiveTab().add({
 					xtype             : 'rallygrid',
@@ -465,8 +462,7 @@ Ext.define('CustomApp', {
 					showPagingToolbar : false,
 					store             : Ext.create('Rally.data.custom.Store', {
 						data       : gridArray,
-						// fields     : ['Team','unparentedStories','untaggedStories','unestimatedStories'],
-						// groupField : (groupTeams) ? 'Team' : null,
+						groupField : (groupTeams) ? 'Team' : null,
 						pageSize   : 1000000,
 						sorters    : [{
 							property  : 'Team',
@@ -476,9 +472,9 @@ Ext.define('CustomApp', {
 							direction : 'ASC'
 						}]
 					}),
-					// features: [Ext.create('Ext.grid.feature.Grouping', {
-				 //       	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
-				 //   	})],
+					features: [Ext.create('Ext.grid.feature.Grouping', {
+				       	groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
+				   	})],
 					columnCfgs : columns
 				});
 				var tags_string = '<b>Tags:</b>';
