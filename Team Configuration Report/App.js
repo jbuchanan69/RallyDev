@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.5.1
+// Team Configuration Report - Version 0.5.2
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -98,6 +98,7 @@ Ext.define('CustomApp', {
 		region      : 'center',
 		margins     : '5 0 0 0',
 		activeTab   : 0, // index or id
+		minTabWidth : 175,
 		defaults    : {
 			autoScroll  : true
 		},
