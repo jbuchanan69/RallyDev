@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.5.2
+// Team Configuration Report - Version 0.5.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -322,6 +322,7 @@ Ext.define('CustomApp', {
 						load : function(store, data, success) {
 							Ext.Array.each(data, function(i) {
 								i.raw.Team               = App.teamNameHash[i.raw.Project];
+								i.raw.TeamNoSpace        = App.teamNameHash[i.raw.Project].replace(/ /g, '___');
 								i.raw.ScheduleState      = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], i.raw.ScheduleState);
 								storyObj[i.raw.ObjectID] = i.raw;
 							});
@@ -359,7 +360,7 @@ Ext.define('CustomApp', {
 			for (i in App.viewport.taggedStories) {
 				if (App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project] == undefined) {
 					App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project] = {
-						teamName           : App.viewport.taggedStories[i].Team,
+						Team               : App.viewport.taggedStories[i].Team,
 						unparentedStories  : 0,
 						untaggedStories    : 0,
 						unestimatedStories : 0
@@ -392,6 +393,10 @@ Ext.define('CustomApp', {
 				drawGrid(
 					[null, App.viewport.unparentedStories, App.viewport.untaggedStories, App.viewport.unestimatedStories][tab_number], true,
 					[{
+						text      : 'Team',
+						dataIndex : 'TeamNoSpace',
+						hidden    : true
+					},{
 						text      : 'ID',
 						dataIndex : '_UnformattedID',
 						width     : 60,
