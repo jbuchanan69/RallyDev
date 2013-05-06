@@ -19,8 +19,8 @@
 
 .half {
 	display    : inline-block;
-	width      : 80px;
-	text-align : center;
+	width      : 62px;
+	white-space: nowrap;
 }
 
 .qSummary {
@@ -37,7 +37,7 @@
 .grey   > .x-grid-cell-inner {
 	border-radius : 3px !important;
 	margin        : 3px !important;
-	text-align    : center;
+	text-align    : center !important; 
 }
 .green  > .x-grid-cell-inner { background : #C6EFCE !important; }
 .red    > .x-grid-cell-inner { background : #FFC7CE !important; }
@@ -46,4 +46,9 @@
 
 .key_label {
 	margin-left: 10px;
+}
+
+#aIter-inputEl.x-form-field,
+#bIter-inputEl.x-form-field {
+	width: 205px !important;
 }

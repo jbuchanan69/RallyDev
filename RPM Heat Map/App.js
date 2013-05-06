@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 3.0.1
+// RPM Heat Map - Version 3.0.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -49,7 +49,7 @@ Ext.define('CustomApp', {
 							<div><b>Scope Change:</b></div>                                                            \
 							<table width="277">                                                                        \
 								<tr>                                                                                   \
-									<td width="33%" class="green"><div class="x-grid-cell-inner">&lt10%</div></td>     \
+									<td width="33%" class="green"><div class="x-grid-cell-inner">0%-10%</div></td>     \
 									<td width="33%" class="yellow"><div class="x-grid-cell-inner">10%-25%</div></td>   \
 									<td width="33%" class="red"><div class="x-grid-cell-inner">&gt25%</div></td>       \
 								</tr>                                                                                  \
@@ -79,7 +79,7 @@ Ext.define('CustomApp', {
 	                        });
 	                        excel_data += '</tr>';
 	                        Ext.Array.each(table.innerHTML.match(/<tr class="x-grid-row.*?<\/tr>/gm), function(line) {
-	                        	excel_data += line.replace(/[^\011\012\015\040-\177]/g, '>>');
+	                        	excel_data += line.replace(/[^\011\012\015\040-\177]/g, '>>').replace(/\//g, 'vs');
 	                        });
 
 	                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
@@ -97,64 +97,19 @@ Ext.define('CustomApp', {
 		items: [{
 			id      : 'settingsPanel',
 			layout  : 'vbox',
-			height  : 70,
+			height  : 38,
 			border  : 0,
 			padding : 5,
 			style   : {
 				borderBottom  : '1px solid #99BCE8'
 			},
 			defaults : {
-				labelWidth : 50,
-				labelAlign : 'right',
-				width      : 265,
+				width      : 270,
 				margins    : '3 0 0 0'
 			},
 			items   : [{
-				xtype          : 'combo',
-				id             : 'queryTypePicker',
-				fieldLabel     : 'Iteration',
-				labelWidth     : 66,
-				width          : 236,
-				editable       : false,
-				forceSelection : true,
-				queryMode      : 'local',
-				displayField   : 'text',
-				valueField     : 'text',
-				value          : 'Single',
-				store          : {
-                    fields: ['text'],
-                    data: [
-                    	{ text: 'Single' },
-                    	{ text: 'Range'  }
-                    ]
-                },
-                listeners: {
-                	change: function() {
-                		Ext.onReady(function() {
-                			if (App.down('#queryTypePicker').getValue() == 'Single') {
-                				App.down('#settingsPanel').setHeight(70);
-                				App.down('#aIter').setValue(App.down('#bIter').getValue());
-                			} else {
-                				App.down('#settingsPanel').setHeight(100);
-                				App.down('#bIter').setValue(App.down('#aIter').getValue());
-                				var items = App.down('#aIter').store.data.items;
-								for (i in items) {
-						    		if (App.down('#aIter').getValue() == items[i].data._ref) {
-						    			if (i < items.length - 2)
-						    				App.down('#aIter').setValue(items[parseInt(i) + 2].data._ref);
-						    			else
-						    				App.down('#aIter').setValue(items[parseInt(items.length - 1)]);
-						    			return;
-						    		}
-						    	}
-                			}
-                		});
-                	}
-                }
-			},{
 				xtype      : 'rallyiterationcombobox',
 				id         : 'aIter',
-				fieldLabel : ' ',
 				listeners  : {
 					change : function() {
 						Ext.onReady(function() {
@@ -165,7 +120,6 @@ Ext.define('CustomApp', {
 			},{
 				xtype      : 'rallyiterationcombobox',
 				id         : 'bIter',
-				fieldLabel : ' ',
 				listeners  : {
 					change : function() {
 						Ext.onReady(function() {
@@ -179,6 +133,46 @@ Ext.define('CustomApp', {
 			layout : 'fit',
 			border : 0,
 			flex   : 1
+		},{
+			id      : 'settingsPanel2',
+			layout  : 'vbox',
+			height  : 30,
+			border  : 0,
+			padding : 5,
+			style   : {
+				borderTop: '1px solid #99BCE8'
+			},
+			items: [{
+				xtype      : 'checkbox',
+				id         : 'queryTypePicker',
+				fieldLabel : 'Multi-Iteration Range',
+				labelWidth : 165,
+				labelAlign : 'right',
+				width      : 290,
+				listeners  : {
+					change : function() {
+						Ext.onReady(function() {
+                			if (App.down('#queryTypePicker').getValue() == false) {
+                				App.down('#settingsPanel').setHeight(38);
+                				App.down('#aIter').setValue(App.down('#bIter').getValue());
+                			} else {
+                				App.down('#settingsPanel').setHeight(70);
+                				App.down('#bIter').setValue(App.down('#aIter').getValue());
+                				var items = App.down('#aIter').store.data.items;
+								for (i in items) {
+						    		if (App.down('#aIter').getValue() == items[i].data._ref) {
+						    			if (i < items.length - 2)
+						    				App.down('#aIter').setValue(items[parseInt(i) + 2].data._ref);
+						    			else
+						    				App.down('#aIter').setValue(items[parseInt(items.length - 1)]);
+						    			return;
+						    		}
+						    	}
+                			}
+                		});
+					}
+				}
+			}]
 		}]
 	},{
 		id          : 'viewport',
@@ -314,7 +308,7 @@ Ext.define('CustomApp', {
 			App.viewport.teamData = {};
 			App.viewport.getIterOIDs(function() {
 				var aDate = Ext.Date.add(App.down('#aIter').getRecord().get('StartDate'), Ext.Date.DAY, 2);
-				var bDate = (App.down('#queryTypePicker').getValue() == 'Range') ? App.down('#bIter').getRecord().get('EndDate') : App.down('#aIter').getRecord().get('EndDate');
+				var bDate = (App.down('#queryTypePicker').getValue() == true) ? App.down('#bIter').getRecord().get('EndDate') : App.down('#aIter').getRecord().get('EndDate');
 			
 				App.viewport.getDataOn(aDate, true, function() {
 					App.viewport.getDataOn(bDate, false, function() {
@@ -329,7 +323,7 @@ Ext.define('CustomApp', {
 			App.viewport.iterOIDs   = [];
 			App.viewport.defectOIDs = [];
 			var filters  = [];
-			if (App.down('#queryTypePicker').getValue() == 'Range') {
+			if (App.down('#queryTypePicker').getValue() == true) {
 				filters.push({
 					property : 'StartDate',
 					operator : '>=',
@@ -499,7 +493,18 @@ Ext.define('CustomApp', {
 				node.acptStoryScopeRate   = parseFloat(node.acptStoryScope / node.storyScope) || 0;
 				node.actualVsEstimateRate = (node.taskEstimateTotal == 0) ? 'N/A' : parseFloat((node.taskActualTotal / node.taskEstimateTotal) - 1) || 0;
 				node.scopeChangeRate      = (node.initStoryScope == 0) ? 'N/A' : parseFloat((node.storyScope / node.initStoryScope) - 1) || 0;
-				node.color                = (node.acptStoryCountRate == 1 && node.acptStoryScopeRate == 1 && node.scopeChangeRate < .1 && node.blockCount == 0 && node.openDefectCount == 0) ? 0 : (node.acptStoryCountRate >= .5 && node.acptStoryScopeRate >= .5 && node.scopeChangeRate <= .25 && node.blockCount <= 1 && node.openDefectCount <= 1) ? 1 : 2;
+				node.color                = (node.acptStoryCountRate == 1    &&
+											 node.acptStoryScopeRate == 1    &&
+											 node.scopeChangeRate    <= .1   &&
+											 node.scopeChangeRate    >= -.1  &&
+											 node.blockCount         == 0    &&
+											 node.openDefectCount    == 0) ? 0 : (
+											 node.acptStoryCountRate >= .5   &&
+											 node.acptStoryScopeRate >= .5   &&
+											 node.scopeChangeRate    <= .25  &&
+											 node.scopeChangeRate    >= -.25 &&
+											 node.blockCount         <= 1    &&
+											 node.openDefectCount    <= 1) ? 1 : 2;
 				gridArray.push(node);
 			}
 			App.down('#viewport').removeAll();
@@ -525,7 +530,7 @@ Ext.define('CustomApp', {
 					flex        : 1,
 					minWidth    : 190,
 					summaryType : function() {
-					return '<div class="qSummary">' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.name + '<br />' + App.down('#aIter').getRawValue() + ((App.down('#queryTypePicker').getValue() == 'Range') ? '<br />' + App.down('#bIter').getRawValue() : '') + '</div>';
+					return '<div class="qSummary">' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.name + '<br />' + App.down('#aIter').getRawValue() + ((App.down('#queryTypePicker').getValue() == true) ? '<br />' + App.down('#bIter').getRawValue() : '') + '</div>';
 				}
 				},{
 					text      : '',
@@ -538,8 +543,8 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Extimated vs Actual Hours',
 					dataIndex : 'actualVsEstimateRate',
-					width     : 190,
-					minWidth  : 95,
+					width     : 160,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						return '<div class="half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + parseInt(val * 100) + '%')) + '</div><div class="half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
@@ -547,7 +552,8 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Remaining Hours',
 					dataIndex : 'taskRemainingTotal',
-					width     : 110,
+					width     : 80,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val) {
 						return Ext.util.Format.number(val, '0,0');
@@ -555,8 +561,8 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Accepted Story Count',
 					dataIndex : 'acptStoryCountRate',
-					width     : 190,
-					minWidth  : 95,
+					width     : 160,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -565,8 +571,8 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Accepted Story Scope',
 					dataIndex : 'acptStoryScopeRate',
-					width     : 190,
-					minWidth  : 95,
+					width     : 160,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -575,7 +581,8 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Blocks',
 					dataIndex : 'blockCount',
-					width     : 110,
+					width     : 80,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -584,7 +591,8 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Open Defects',
 					dataIndex : 'openDefectCount',
-					width     : 110,
+					width     : 80,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -593,11 +601,11 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Scope Change',
 					dataIndex : 'scopeChangeRate',
-					width     : 190,
-					minWidth  : 95,
+					width     : 160,
+					minWidth  : 80,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
-						(val < .1 && val > -.1) ? meta.tdCls = 'green' : (val <= .25 && val >= -.25) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						(val <= .1 && val >= -.1) ? meta.tdCls = 'green' : (val <= .25 && val >= -.25) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
 						return '<div class="half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + Ext.util.Format.number(val * 100, '0,0') + '%')) + '</div><div class="half">' + record.get('initStoryScope') + ' &rArr; ' + record.get('storyScope') + '</div>';
 					}
 				}],
