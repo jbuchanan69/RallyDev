@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 3.0.3
+// RPM Heat Map - Version 3.0.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -79,7 +79,7 @@ Ext.define('CustomApp', {
 	                        });
 	                        excel_data += '</tr>';
 	                        Ext.Array.each(table.innerHTML.match(/<tr class="x-grid-row.*?<\/tr>/gm), function(line) {
-	                        	excel_data += line.replace(/[^\011\012\015\040-\177]/g, '>>').replace(/\//g, 'vs');
+	                        	excel_data += line.replace(/[^\011\012\015\040-\177]/g, '>>');
 	                        });
 
 	                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
@@ -183,14 +183,32 @@ Ext.define('CustomApp', {
 
     launch: function() {
     	App = this;
-    	App.iterNameHash = {};
-    	App.teamNameHash = {};
-    	App.down('#viewport').addListener('resize', function() {
+		App.iterNameHash  = {};
+		App.teamNameHash  = {};
+		App.viewableTeams = [];
+		App.down('#viewport').addListener('resize', function() {
 			if (App.popup) {
 				App.popup.setWidth(Ext.getBody().getWidth());
 				App.popup.setHeight(Ext.getBody().getHeight());
 			}
 		});
+		var loader = Ext.create('Rally.data.WsapiDataStore', {
+			model     : 'Project',
+			fetch     : ['ObjectID'],
+			listeners : {
+				load : function(store, data) {
+					if (data && data.length) {
+						Ext.Array.each(data, function(i) {
+							App.viewableTeams.push(i.raw.ObjectID);
+						});
+						loader.nextPage();
+					} else {
+						App.rpmTree.init();
+					}
+				}
+			}
+		});
+		loader.loadPage(1);
     },
 
     rpmTree: {
@@ -294,16 +312,11 @@ Ext.define('CustomApp', {
 				});
 				
 			}
-		}()
+		}
 	},
 
 	viewport: {
 		update: function() {
-			App.updateTimeout = setTimeout(function() {
-				Ext.getBody().unmask();
-				App.down('#viewport').removeAll();
-				Ext.Msg.alert('Error', 'Query timed out. Possibly the result of misconfigured permissions.');
-			}, 10000);
 			Ext.getBody().mask('Loading');
 			App.viewport.teamData = {};
 			App.viewport.getIterOIDs(function() {
@@ -397,6 +410,10 @@ Ext.define('CustomApp', {
 					property : 'Iteration',
 					operator : '!=',
 					value    : null
+				},{
+					property : 'Project',
+					operator : 'in',
+					value    : App.viewableTeams
 				}],
 				listeners : {
 					load : function(store, data, success) {
@@ -467,6 +484,10 @@ Ext.define('CustomApp', {
 					property : 'ObjectID',
 					operator : 'in',
 					value    : App.viewport.defectOIDs
+				},{
+					property : 'Project',
+					operator : 'in',
+					value    : App.viewableTeams
 				}],
 				listeners : {
 					load : function(store, data, success) {
@@ -483,7 +504,6 @@ Ext.define('CustomApp', {
 		},
 
 		drawGrid: function() {
-			clearTimeout(App.updateTimeout);
 			Ext.getBody().unmask();
 			var gridArray = [];
 			var node;
