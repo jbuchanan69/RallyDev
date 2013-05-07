@@ -35,8 +35,8 @@
 .red    > .x-grid-cell-inner,
 .yellow > .x-grid-cell-inner,
 .grey   > .x-grid-cell-inner {
-	border-radius : 3px !important;
-	margin        : 3px !important;
+	border-radius : 3px    !important;
+	margin        : 3px    !important;
 	text-align    : center !important; 
 }
 .green  > .x-grid-cell-inner { background : #C6EFCE !important; }

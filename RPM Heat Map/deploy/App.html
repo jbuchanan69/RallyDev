@@ -7,7 +7,7 @@
 
     <script type="text/javascript">
         Rally.onReady(function() {
-            // RPM Heat Map - Version 3.0.4
+            // RPM Heat Map - Version 3.0.5
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -605,7 +605,7 @@
             					align     : 'center',
             					renderer  : function(val, meta, record) {
             						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-            						return '<div class="half">' + parseInt(val * 100) + '%</div><div class="half">' + record.get('acptStoryCount') + ' of ' + record.get('storyCount') + '</div>';
+            						return '<div class="half">' + parseInt(val * 100) + '%</div><div class="half">' + record.get('acptStoryScope') + ' of ' + record.get('storyScope') + '</div>';
             					}
             				},{
             					text      : 'Blocks',
@@ -874,8 +874,8 @@
         .red    > .x-grid-cell-inner,
         .yellow > .x-grid-cell-inner,
         .grey   > .x-grid-cell-inner {
-        	border-radius : 3px !important;
-        	margin        : 3px !important;
+        	border-radius : 3px    !important;
+        	margin        : 3px    !important;
         	text-align    : center !important; 
         }
         .green  > .x-grid-cell-inner { background : #C6EFCE !important; }
