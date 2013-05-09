@@ -369,7 +369,6 @@ Ext.define('CustomApp', {
 							});
 							loader.nextPage();
 						} else {
-							console.log(App.viewport.iterOIDs.length);
 							callback();
 						}
 					}
