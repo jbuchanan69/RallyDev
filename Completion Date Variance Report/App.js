@@ -29,8 +29,8 @@ Ext.define('CustomApp', {
 					title     : 'Completion Date Variance Report - Help',
 					items     : {
 						xtype: 'component',
-						html: '                                                                                         \
-							<table class="helpTable" width="100%" border="1">                                           \
+						html: "                                                                                         \
+							<table class='helpTable' width='100%' border='1'>                                           \
 								<tr>                                                                                    \
 									<td><i>Italic Date:</i></td>                                                        \
 									<td>Iterations have not been planned out far enough to align the forecasted end     \
@@ -48,13 +48,13 @@ Ext.define('CustomApp', {
 									</td>                                                                               \
 								<tr>                                                                                    \
 								<tr>                                                                                    \
-									<td class="green"><div class="x-grid-cell-inner">Green Date</div></td>              \
-									<td>This RPM element has been assigned an "Actual Completed Date". The forecasted   \
-									completion date has been replaced by the element\'s actual completion date.         \
+									<td class='green'><div class='x-grid-cell-inner'>Green Date</div></td>              \
+									<td>This RPM element has been assigned an 'Actual Completed Date'. The forecasted   \
+									completion date has been replaced by the element's actual completion date.          \
 									</td>                                                                               \
 								<tr>                                                                                    \
 							</table>                                                                                    \
-						',
+						",
 						padding: 10
 					}
 				});
