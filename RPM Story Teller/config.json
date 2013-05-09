@@ -6,6 +6,7 @@
         "App.js"
     ],
     "css": [
+    	"../base.css",
         "app.css"
     ]
 }

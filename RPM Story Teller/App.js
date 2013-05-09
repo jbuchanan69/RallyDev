@@ -1,4 +1,4 @@
-// RPM Story Teller - Version 1.3
+// RPM Story Teller - Version 1.4.1
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -13,34 +13,64 @@ Ext.define('CustomApp', {
 		split       : true
 	},
 	items: [{
-		title       : 'Settings',
-		id          : 'popout',
-		region      : 'west',
-		margins     : '5 0 0 0',
+		title   : 'Settings',
+		id      : 'popout',
+		region  : 'west',
+		margins : '5 0 0 0',
+		width   : 270,
+		tools: [{
+			type    :'save',
+			handler : function(event, toolEl, panel){
+		    	Ext.onReady(function() {
+		    		if (/*@cc_on!@*/0) { //Exporting to Excel not supported in IE
+			            Ext.Msg.alert('Error', 'Exporting to CSV is not supported in Internet Explorer. Please switch to a different browser and try again.');
+			        } else if (App.down('#viewport_grid')) {
+                    	Ext.getBody().mask('Exporting Chart...');
+	                    setTimeout(function() {
+	                        var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>';
+	                        var base64   = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+	                        var format   = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+	                        var table    = document.getElementById('viewport_grid');
+
+	                        var excel_data = '<tr>';
+	                        Ext.Array.each(table.innerHTML.match(/<span .*?x-column-header-text.*?>.*?<\/span>/gm), function(column_header_span) {
+	                            excel_data += (column_header_span.replace(/span/g,'td'));
+	                        });
+	                        excel_data += '</tr>';
+	                        Ext.Array.each(table.innerHTML.match(/<tr class="x-grid-row.*?<\/tr>/gm), function(line) {
+	                        	if (!line.match(/x-grid-row-summary/)) excel_data += line.replace(/___/g,' ');
+	                        });
+
+	                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
+	                        window.location.href = 'data:application/vnd.ms-excel;base64,' + base64(format(template, ctx));
+	                        Ext.getBody().unmask();
+	                    }, 500);
+                    }
+                });
+		    }
+		}],
 		layout: {
 			type  : 'vbox',
-			align : 'stretch',
-			pack  : 'start',
+			align : 'stretch'
 		},
 		items: [{
 			id      : 'settingsPanel',
-			layout  : 'fit',
-			height  : 34,
+			layout  : 'vbox',
+			height  : 38,
 			border  : 0,
 			padding : 5,
 			style   : {
 				borderBottom  : '1px solid #99BCE8'
 			},
-			items       : [{
+			items   : [{
 				xtype      : 'rallyiterationcombobox',
 				id         : 'iterPicker',
-				width      : 300,
-				fieldLabel : 'Iteration:',
-				labelWidth : 40,
+				width      : 270,
+				margins    : '3 0 0 0',
 				listeners  : {
 					change : function() {
 						Ext.onReady(function() {
-							App.viewport.update();
+							if (App.down('#rpmTree').getSelectionModel().getSelection().length > 0) App.viewport.update();
 						});
 					}
 				}
@@ -59,7 +89,6 @@ Ext.define('CustomApp', {
 	}],
 
 	launch: function() {
-		Ext.getBody().mask('Initializing UI...');
 		App = this;
 		App.usStore = {};
 		App.rpmTree.init();
@@ -70,7 +99,12 @@ Ext.define('CustomApp', {
 			Ext.create('Rally.data.WsapiDataStore', {
 	            autoLoad: true,
 	            model: 'PortfolioItem/Initiative',
-	            fetch: ['Children','LeafStoryCount','Name','ObjectID'],
+	            fetch: [
+	            	'Children',
+	            	'LeafStoryCount',
+	            	'Name',
+	            	'ObjectID'
+	            ],
 	            listeners: {
 	                load: function(store, data) {
 	                    if (data.length == 0) {
@@ -112,7 +146,6 @@ Ext.define('CustomApp', {
 					border       : 0,
 					listeners    : {
 						added    : function() {
-							App.down('#popout').setWidth(250);
 							Ext.getBody().unmask();
 						},
 						beforeitemexpand: function(node) {
@@ -139,14 +172,14 @@ Ext.define('CustomApp', {
 
 							function getChildren(child_type, callback) {
 								Ext.create('Rally.data.WsapiDataStore', {
-									autoLoad: true,
-									model: 'PortfolioItem/' + child_type,
-									filters: [{
-										property: 'Parent.ObjectID',
-										value: node.raw.id
+									autoLoad : true,
+									model    : 'PortfolioItem/' + child_type,
+									filters  : [{
+										property : 'Parent.ObjectID',
+										value    : node.raw.id
 									}],
-									fetch: ['Children','LeafStoryCount','Name','ObjectID'],
-									listeners: {
+									fetch     : ['Children','LeafStoryCount','Name','ObjectID'],
+									listeners : {
 										load: function(store, data) {
 											callback(data);
 										}
@@ -168,6 +201,12 @@ Ext.define('CustomApp', {
 	viewport: {
 		update: function() {
 			var gridArray = [];
+			var totalsArray = [{
+				TotalPlanEstimate       : 0,
+				TotalEstimatedTaskHours : 0,
+				TotalActualTaskHours    : 0,
+				TotalRemainingTaskHours : 0
+			}];
 			App.down('#viewport').removeAll();
 			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) {
 				return; //Nothing to render
@@ -185,6 +224,40 @@ Ext.define('CustomApp', {
 						xtype             : 'rallygrid',
 						disableSelection  : true,
 						showPagingToolbar : false,
+						hideHeaders       : true,
+						store             : Ext.create('Rally.data.custom.Store', {
+							data     : totalsArray,
+							pageSize : 1,
+						}),
+						columnCfgs : [{
+							flex      : 1
+						},{
+							width     : 75,
+							align     : 'center',
+							dataIndex : 'TotalPlanEstimate',
+							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+						},{
+							width     : 75,
+							align     : 'center',
+							dataIndex : 'TotalEstimatedTaskHours',
+							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+						},{
+							width     : 75,
+							align     : 'center',
+							dataIndex : 'TotalActualTaskHours',
+							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+						},{
+							width     : 75,
+							align     : 'center',
+							dataIndex : 'TotalRemainingTaskHours',
+							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+						}]
+					});
+					App.down('#viewport').add({
+						xtype             : 'rallygrid',
+						id                : 'viewport_grid',
+						disableSelection  : true,
+						showPagingToolbar : false,
 						store: Ext.create('Rally.data.custom.Store', {
 							data       : gridArray,
 							groupField : 'Team',
@@ -198,11 +271,13 @@ Ext.define('CustomApp', {
 						features: [{
 							id: 'group',
 				            ftype: 'groupingsummary',
-				            groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})',
-				            hideGroupedHeader: true,
-				            enableGroupingMenu: false
+				            groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
 						}],
 						columnCfgs: [{
+							text      : 'Team',
+							dataIndex : 'TeamNoSpace',
+							hidden    : true
+						},{
 							text      : 'ID',
 							dataIndex : '_UnformattedID',
 							width     : 60,
@@ -229,7 +304,7 @@ Ext.define('CustomApp', {
 							align           : 'center',
 							summaryType     : 'sum',
 							summaryRenderer : function(val, data, idx) {
-				                return '<b>' + val + '</b>';
+				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
 				            }
 						},{
 							text            : 'Estimated Task Hours',
@@ -238,7 +313,7 @@ Ext.define('CustomApp', {
 							align           : 'center',
 							summaryType     : 'sum',
 							summaryRenderer : function(val, data, idx) {
-				                return '<b>' + val + '</b>';
+				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
 				            }
 						},{
 							text            : 'Actual Task Hours',
@@ -247,7 +322,7 @@ Ext.define('CustomApp', {
 							align           : 'center',
 							summaryType     : 'sum',
 							summaryRenderer : function(val, data, idx) {
-				                return '<b>' + val + '</b>';
+				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
 				            }
 						},{
 							text            : 'Remaining Task Hours',
@@ -256,7 +331,7 @@ Ext.define('CustomApp', {
 							align           : 'center',
 							summaryType     : 'sum',
 							summaryRenderer : function(val, data, idx) {
-				                return '<b>' + val + '</b>';
+				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
 				            }
 						}]
 					});
@@ -318,8 +393,15 @@ Ext.define('CustomApp', {
 									listeners: {
 										load: function(store, data) {
 											Ext.Array.each(data, function(s) {
-												s.raw.Team = iterProjectHash[s.raw.Iteration];
-												s.raw.State = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
+												s.raw.Team        = iterProjectHash[s.raw.Iteration];
+												s.raw.TeamNoSpace = iterProjectHash[s.raw.Iteration].replace(/ /g,'___');
+												s.raw.State       = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
+												
+												totalsArray[0].TotalPlanEstimate       += parseFloat(s.raw.PlanEstimate)       || 0.0;
+												totalsArray[0].TotalEstimatedTaskHours += parseFloat(s.raw.TaskEstimateTotal)  || 0.0;
+												totalsArray[0].TotalActualTaskHours    += parseFloat(s.raw.TaskActualTotal)    || 0.0;
+												totalsArray[0].TotalRemainingTaskHours += parseFloat(s.raw.TaskRemainingTotal) || 0.0;
+
 												gridArray.push(s.raw);
 											});
 											callback();

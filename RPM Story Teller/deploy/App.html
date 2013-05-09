@@ -7,7 +7,7 @@
 
     <script type="text/javascript">
         Rally.onReady(function() {
-            // RPM Story Teller - Version 1.3
+            // RPM Story Teller - Version 1.4.1
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -22,34 +22,64 @@
             		split       : true
             	},
             	items: [{
-            		title       : 'Settings',
-            		id          : 'popout',
-            		region      : 'west',
-            		margins     : '5 0 0 0',
+            		title   : 'Settings',
+            		id      : 'popout',
+            		region  : 'west',
+            		margins : '5 0 0 0',
+            		width   : 270,
+            		tools: [{
+            			type    :'save',
+            			handler : function(event, toolEl, panel){
+            		    	Ext.onReady(function() {
+            		    		if (/*@cc_on!@*/0) { //Exporting to Excel not supported in IE
+            			            Ext.Msg.alert('Error', 'Exporting to CSV is not supported in Internet Explorer. Please switch to a different browser and try again.');
+            			        } else if (App.down('#viewport_grid')) {
+                                	Ext.getBody().mask('Exporting Chart...');
+            	                    setTimeout(function() {
+            	                        var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>';
+            	                        var base64   = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+            	                        var format   = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+            	                        var table    = document.getElementById('viewport_grid');
+            
+            	                        var excel_data = '<tr>';
+            	                        Ext.Array.each(table.innerHTML.match(/<span .*?x-column-header-text.*?>.*?<\/span>/gm), function(column_header_span) {
+            	                            excel_data += (column_header_span.replace(/span/g,'td'));
+            	                        });
+            	                        excel_data += '</tr>';
+            	                        Ext.Array.each(table.innerHTML.match(/<tr class="x-grid-row.*?<\/tr>/gm), function(line) {
+            	                        	if (!line.match(/x-grid-row-summary/)) excel_data += line.replace(/___/g,' ');
+            	                        });
+            
+            	                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
+            	                        window.location.href = 'data:application/vnd.ms-excel;base64,' + base64(format(template, ctx));
+            	                        Ext.getBody().unmask();
+            	                    }, 500);
+                                }
+                            });
+            		    }
+            		}],
             		layout: {
             			type  : 'vbox',
-            			align : 'stretch',
-            			pack  : 'start',
+            			align : 'stretch'
             		},
             		items: [{
             			id      : 'settingsPanel',
-            			layout  : 'fit',
-            			height  : 34,
+            			layout  : 'vbox',
+            			height  : 38,
             			border  : 0,
             			padding : 5,
             			style   : {
             				borderBottom  : '1px solid #99BCE8'
             			},
-            			items       : [{
+            			items   : [{
             				xtype      : 'rallyiterationcombobox',
             				id         : 'iterPicker',
-            				width      : 300,
-            				fieldLabel : 'Iteration:',
-            				labelWidth : 40,
+            				width      : 270,
+            				margins    : '3 0 0 0',
             				listeners  : {
             					change : function() {
             						Ext.onReady(function() {
-            							App.viewport.update();
+            							if (App.down('#rpmTree').getSelectionModel().getSelection().length > 0) App.viewport.update();
             						});
             					}
             				}
@@ -68,7 +98,6 @@
             	}],
             
             	launch: function() {
-            		Ext.getBody().mask('Initializing UI...');
             		App = this;
             		App.usStore = {};
             		App.rpmTree.init();
@@ -79,7 +108,12 @@
             			Ext.create('Rally.data.WsapiDataStore', {
             	            autoLoad: true,
             	            model: 'PortfolioItem/Initiative',
-            	            fetch: ['Children','LeafStoryCount','Name','ObjectID'],
+            	            fetch: [
+            	            	'Children',
+            	            	'LeafStoryCount',
+            	            	'Name',
+            	            	'ObjectID'
+            	            ],
             	            listeners: {
             	                load: function(store, data) {
             	                    if (data.length == 0) {
@@ -121,7 +155,6 @@
             					border       : 0,
             					listeners    : {
             						added    : function() {
-            							App.down('#popout').setWidth(250);
             							Ext.getBody().unmask();
             						},
             						beforeitemexpand: function(node) {
@@ -148,14 +181,14 @@
             
             							function getChildren(child_type, callback) {
             								Ext.create('Rally.data.WsapiDataStore', {
-            									autoLoad: true,
-            									model: 'PortfolioItem/' + child_type,
-            									filters: [{
-            										property: 'Parent.ObjectID',
-            										value: node.raw.id
+            									autoLoad : true,
+            									model    : 'PortfolioItem/' + child_type,
+            									filters  : [{
+            										property : 'Parent.ObjectID',
+            										value    : node.raw.id
             									}],
-            									fetch: ['Children','LeafStoryCount','Name','ObjectID'],
-            									listeners: {
+            									fetch     : ['Children','LeafStoryCount','Name','ObjectID'],
+            									listeners : {
             										load: function(store, data) {
             											callback(data);
             										}
@@ -177,6 +210,12 @@
             	viewport: {
             		update: function() {
             			var gridArray = [];
+            			var totalsArray = [{
+            				TotalPlanEstimate       : 0,
+            				TotalEstimatedTaskHours : 0,
+            				TotalActualTaskHours    : 0,
+            				TotalRemainingTaskHours : 0
+            			}];
             			App.down('#viewport').removeAll();
             			if (App.down('#rpmTree').getSelectionModel().getSelection().length == 0) {
             				return; //Nothing to render
@@ -194,6 +233,40 @@
             						xtype             : 'rallygrid',
             						disableSelection  : true,
             						showPagingToolbar : false,
+            						hideHeaders       : true,
+            						store             : Ext.create('Rally.data.custom.Store', {
+            							data     : totalsArray,
+            							pageSize : 1,
+            						}),
+            						columnCfgs : [{
+            							flex      : 1
+            						},{
+            							width     : 75,
+            							align     : 'center',
+            							dataIndex : 'TotalPlanEstimate',
+            							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+            						},{
+            							width     : 75,
+            							align     : 'center',
+            							dataIndex : 'TotalEstimatedTaskHours',
+            							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+            						},{
+            							width     : 75,
+            							align     : 'center',
+            							dataIndex : 'TotalActualTaskHours',
+            							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+            						},{
+            							width     : 75,
+            							align     : 'center',
+            							dataIndex : 'TotalRemainingTaskHours',
+            							renderer  : function(val) { return '<b>' + (Math.round(val * 100) / 100) + '</b>'; }
+            						}]
+            					});
+            					App.down('#viewport').add({
+            						xtype             : 'rallygrid',
+            						id                : 'viewport_grid',
+            						disableSelection  : true,
+            						showPagingToolbar : false,
             						store: Ext.create('Rally.data.custom.Store', {
             							data       : gridArray,
             							groupField : 'Team',
@@ -207,11 +280,13 @@
             						features: [{
             							id: 'group',
             				            ftype: 'groupingsummary',
-            				            groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})',
-            				            hideGroupedHeader: true,
-            				            enableGroupingMenu: false
+            				            groupHeaderTpl: '{name} ({rows.length} User Stor{[values.rows.length > 1 ? "ies" : "y"]})'
             						}],
             						columnCfgs: [{
+            							text      : 'Team',
+            							dataIndex : 'TeamNoSpace',
+            							hidden    : true
+            						},{
             							text      : 'ID',
             							dataIndex : '_UnformattedID',
             							width     : 60,
@@ -238,7 +313,7 @@
             							align           : 'center',
             							summaryType     : 'sum',
             							summaryRenderer : function(val, data, idx) {
-            				                return '<b>' + val + '</b>';
+            				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
             				            }
             						},{
             							text            : 'Estimated Task Hours',
@@ -247,7 +322,7 @@
             							align           : 'center',
             							summaryType     : 'sum',
             							summaryRenderer : function(val, data, idx) {
-            				                return '<b>' + val + '</b>';
+            				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
             				            }
             						},{
             							text            : 'Actual Task Hours',
@@ -256,7 +331,7 @@
             							align           : 'center',
             							summaryType     : 'sum',
             							summaryRenderer : function(val, data, idx) {
-            				                return '<b>' + val + '</b>';
+            				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
             				            }
             						},{
             							text            : 'Remaining Task Hours',
@@ -265,7 +340,7 @@
             							align           : 'center',
             							summaryType     : 'sum',
             							summaryRenderer : function(val, data, idx) {
-            				                return '<b>' + val + '</b>';
+            				                return '<b>' + (Math.round(val * 100) / 100) + '</b>';
             				            }
             						}]
             					});
@@ -327,8 +402,15 @@
             									listeners: {
             										load: function(store, data) {
             											Ext.Array.each(data, function(s) {
-            												s.raw.Team = iterProjectHash[s.raw.Iteration];
-            												s.raw.State = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
+            												s.raw.Team        = iterProjectHash[s.raw.Iteration];
+            												s.raw.TeamNoSpace = iterProjectHash[s.raw.Iteration].replace(/ /g,'___');
+            												s.raw.State       = Ext.Array.indexOf(['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'], s.raw.ScheduleState);
+            												
+            												totalsArray[0].TotalPlanEstimate       += parseFloat(s.raw.PlanEstimate)       || 0.0;
+            												totalsArray[0].TotalEstimatedTaskHours += parseFloat(s.raw.TaskEstimateTotal)  || 0.0;
+            												totalsArray[0].TotalActualTaskHours    += parseFloat(s.raw.TaskActualTotal)    || 0.0;
+            												totalsArray[0].TotalRemainingTaskHours += parseFloat(s.raw.TaskRemainingTotal) || 0.0;
+            
             												gridArray.push(s.raw);
             											});
             											callback();
@@ -352,31 +434,80 @@
 
     <style type="text/css">
         #rpmTree .x-grid-cell-inner .count {
-        	width            : 25px;
-        	border           : 1px solid #B7841F;
-        	display          : inline-block;
-        	text-align       : center;
-        	font-size        : 9px;
-        	height           : 13px;
-        	line-height      : 12px;
-        	background       : #FFE993;
-        	border-radius    : 3px;
-        	background-image : linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-        	background-image : -o-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-        	background-image : -moz-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-        	background-image : -webkit-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-        	background-image : -ms-linear-gradient(bottom, rgb(255,218,117) 40%, rgb(255,255,186) 85%);
-        	background-image : -webkit-gradient(
-        		linear,
-        		left bottom,
-        		left top,
-        		color-stop(0.4, rgb(255,218,117)),
-        		color-stop(0.85, rgb(255,255,186))
-        	);
+        	width         : 25px;
+        	border        : 1px solid #B7841F;
+        	display       : inline-block;
+        	text-align    : center;
+        	font-size     : 9px;
+        	height        : 13px;
+        	line-height   : 12px;
+        	border-radius : 3px;
+        	background    : #ffff99;
+        	background    : -moz-linear-gradient(top,  #ffff99 0%, #ffd46f 100%);
+        	background    : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffff99), color-stop(100%,#ffd46f));
+        	background    : -webkit-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+        	background    : -o-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+        	background    : -ms-linear-gradient(top,  #ffff99 0%,#ffd46f 100%);
+        	background    : linear-gradient(to bottom,  #ffff99 0%,#ffd46f 100%);
+        	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
         }
         
-        .error {
-        	text-align : center;
+        .x-tree-icon { display    : none    !important; }
+        
+        .green  > .x-grid-cell-inner,
+        .red    > .x-grid-cell-inner,
+        .yellow > .x-grid-cell-inner,
+        .grey   > .x-grid-cell-inner {
+        	border-radius : 3px    !important;
+        	margin        : 3px    !important;
+        	text-align    : center !important; 
+        }
+        .green > .x-grid-cell-inner {
+        	border     : 1px solid #afd3b6;
+        	background : #c6efce;
+        	background : -moz-linear-gradient(top,  #c6efce 0%, #afd3b6 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#c6efce), color-stop(100%,#afd3b6));
+        	background : -webkit-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -o-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -ms-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : linear-gradient(to bottom,  #c6efce 0%,#afd3b6 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#c6efce', endColorstr='#afd3b6',GradientType=0 );
+        }
+        
+        .red > .x-grid-cell-inner {
+        	border     : 1px solid #e5b5ba;
+        	background : #ffc7ce;
+        	background : -moz-linear-gradient(top,  #ffc7ce 0%, #e5b5ba 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffc7ce), color-stop(100%,#e5b5ba));
+        	background : -webkit-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -o-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -ms-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : linear-gradient(to bottom,  #ffc7ce 0%,#e5b5ba 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffc7ce', endColorstr='#e5b5ba',GradientType=0 );
+        }
+        .yellow > .x-grid-cell-inner {
+        	border     : 1px solid #e5d28e;
+        	background : #ffeb9c;
+        	background : -moz-linear-gradient(top,  #ffeb9c 0%, #e5d28e 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffeb9c), color-stop(100%,#e5d28e));
+        	background : -webkit-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -o-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -ms-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : linear-gradient(to bottom,  #ffeb9c 0%,#e5d28e 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffeb9c', endColorstr='#e5d28e',GradientType=0 );
+        }
+        .grey > .x-grid-cell-inner {
+        	border     : 1px solid #cfd1d3;
+        	background : #e7ebee;
+        	background : -moz-linear-gradient(top,  #e7ebee 0%, #cfd1d3 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#e7ebee), color-stop(100%,#cfd1d3));
+        	background : -webkit-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -o-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -ms-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : linear-gradient(to bottom,  #e7ebee 0%,#cfd1d3 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#e7ebee', endColorstr='#cfd1d3',GradientType=0 );
+        }        #iterPicker-inputEl.x-form-field {
+        	width: 205px !important;
         }    </style>
 </head>
 <body></body>
