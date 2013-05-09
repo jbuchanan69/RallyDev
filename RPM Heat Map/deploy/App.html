@@ -7,7 +7,7 @@
 
     <script type="text/javascript">
         Rally.onReady(function() {
-            // RPM Heat Map - Version 3.0.6
+            // RPM Heat Map - Version 3.0.7
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -364,13 +364,13 @@
             			}
             			var loader = Ext.create('Rally.data.WsapiDataStore', {
             				model     : 'Iteration',
-            				fetch     : ['ObjectID','Name','Project'],
+            				fetch     : ['ObjectID','Name','Project','UserIterationCapacities'],
             				filters   : filters,
             				listeners : {
             					load : function(store, data) {
             						if (data && data.length) {
             							Ext.Array.each(data, function(i) {
-            								if (Ext.Array.indexOf(App.viewableTeams, i.raw.Project.ObjectID) != -1) {
+            								if (i.raw.UserIterationCapacities.length > 0 && Ext.Array.indexOf(App.viewableTeams, i.raw.Project.ObjectID) != -1) {
             									App.viewport.iterOIDs.push(i.raw.ObjectID);
             									App.iterNameHash[i.raw.ObjectID] = i.raw.Name;
             									App.teamNameHash[i.raw.Project.ObjectID] = i.raw.Project.Name;
@@ -378,6 +378,7 @@
             							});
             							loader.nextPage();
             						} else {
+            							console.log(App.viewport.iterOIDs.length);
             							callback();
             						}
             					}
@@ -566,25 +567,26 @@
             				},{
             					text      : '',
             					dataIndex : 'color',
-            					width     : 27,
+            					width     : 29,
+            					resizable : false,
             					renderer  : function(val, meta) {
             						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red'; 
             						return '';
             					}
             				},{
-            					text      : 'Extimated vs Actual Hours',
+            					text      : 'Estimated vs Actual Hours',
             					dataIndex : 'actualVsEstimateRate',
-            					width     : 160,
-            					minWidth  : 80,
+            					width     : 152,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val, meta, record) {
-            						return '<div class="half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + parseInt(val * 100) + '%')) + '</div><div class="half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
+            						return '<div class="left half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + parseInt(val * 100) + '%')) + '</div><div class="right half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
             					}
             				},{
             					text      : 'Remaining Hours',
             					dataIndex : 'taskRemainingTotal',
-            					width     : 80,
-            					minWidth  : 80,
+            					width     : 76,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val) {
             						return Ext.util.Format.number(val, '0,0');
@@ -592,52 +594,52 @@
             				},{
             					text      : 'Accepted Story Count',
             					dataIndex : 'acptStoryCountRate',
-            					width     : 160,
-            					minWidth  : 80,
+            					width     : 152,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val, meta, record) {
             						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-            						return '<div class="half">' + parseInt(val * 100) + '%</div><div class="half">' + record.get('acptStoryCount') + ' of ' + record.get('storyCount') + '</div>';
+            						return '<div class="left half">' + parseInt(val * 100) + '%</div><div class="right half">' + record.get('acptStoryCount') + ' of ' + record.get('storyCount') + '</div>';
             					}
             				},{
             					text      : 'Accepted Story Scope',
             					dataIndex : 'acptStoryScopeRate',
-            					width     : 160,
-            					minWidth  : 80,
+            					width     : 152,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val, meta, record) {
             						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-            						return '<div class="half">' + parseInt(val * 100) + '%</div><div class="half">' + record.get('acptStoryScope') + ' of ' + record.get('storyScope') + '</div>';
+            						return '<div class="left half">' + parseInt(val * 100) + '%</div><div class="right half">' + record.get('acptStoryScope') + ' of ' + record.get('storyScope') + '</div>';
             					}
             				},{
             					text      : 'Blocks',
             					dataIndex : 'blockCount',
-            					width     : 80,
-            					minWidth  : 80,
+            					width     : 76,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val, meta, record) {
             						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-            						return '<div class="half">' + val + '</div>';
+            						return val;
             					}
             				},{
             					text      : 'Open Defects',
             					dataIndex : 'openDefectCount',
-            					width     : 80,
-            					minWidth  : 80,
+            					width     : 76,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val, meta, record) {
             						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-            						return '<div class="half">' + val + '</div>';
+            						return val;
             					}
             				},{
             					text      : 'Scope Change',
             					dataIndex : 'scopeChangeRate',
-            					width     : 160,
-            					minWidth  : 80,
+            					width     : 152,
+            					minWidth  : 76,
             					align     : 'center',
             					renderer  : function(val, meta, record) {
             						(val <= .1 && val >= -.1) ? meta.tdCls = 'green' : (val <= .25 && val >= -.25) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-            						return '<div class="half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + Ext.util.Format.number(val * 100, '0,0') + '%')) + '</div><div class="half">' + record.get('initStoryScope') + ' &rArr; ' + record.get('storyScope') + '</div>';
+            						return '<div class="left half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + Ext.util.Format.number(val * 100, '0,0') + '%')) + '</div><div class="right half">' + record.get('initStoryScope') + ' &rArr; ' + record.get('storyScope') + '</div>';
             					}
             				}],
             				listeners: {
@@ -754,7 +756,8 @@
             									columnCfgs        : [{
             										text      : '',
             										dataIndex : 'color',
-            										width     : 27,
+            										width     : 29,
+            										resizable : false,
             										align     : 'center',
             										renderer  : function(val, meta, record) {
             											(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'red' : (val == 2) ? meta.tdCls = 'yellow' : null;
@@ -858,18 +861,6 @@
         	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
         }
         
-        .half {
-        	display    : inline-block;
-        	width      : 62px;
-        	white-space: nowrap;
-        }
-        
-        .qSummary {
-        	font-size   : 12px;
-        	line-height : 15px;
-        	font-style  : italic;
-        }
-        
         .x-tree-icon { display    : none    !important; }
         
         .green  > .x-grid-cell-inner,
@@ -880,18 +871,72 @@
         	margin        : 3px    !important;
         	text-align    : center !important; 
         }
-        .green  > .x-grid-cell-inner { background : #C6EFCE !important; }
-        .red    > .x-grid-cell-inner { background : #FFC7CE !important; }
-        .yellow > .x-grid-cell-inner { background : #FFEB9C !important; }
-        .grey   > .x-grid-cell-inner { background : #E7EBEE !important; }
+        .green > .x-grid-cell-inner {
+        	border     : 1px solid #afd3b6;
+        	background : #c6efce;
+        	background : -moz-linear-gradient(top,  #c6efce 0%, #afd3b6 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#c6efce), color-stop(100%,#afd3b6));
+        	background : -webkit-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -o-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -ms-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : linear-gradient(to bottom,  #c6efce 0%,#afd3b6 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#c6efce', endColorstr='#afd3b6',GradientType=0 );
+        }
+        
+        .red > .x-grid-cell-inner {
+        	border     : 1px solid #e5b5ba;
+        	background : #ffc7ce;
+        	background : -moz-linear-gradient(top,  #ffc7ce 0%, #e5b5ba 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffc7ce), color-stop(100%,#e5b5ba));
+        	background : -webkit-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -o-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -ms-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : linear-gradient(to bottom,  #ffc7ce 0%,#e5b5ba 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffc7ce', endColorstr='#e5b5ba',GradientType=0 );
+        }
+        .yellow > .x-grid-cell-inner {
+        	border     : 1px solid #e5d28e;
+        	background : #ffeb9c;
+        	background : -moz-linear-gradient(top,  #ffeb9c 0%, #e5d28e 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffeb9c), color-stop(100%,#e5d28e));
+        	background : -webkit-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -o-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -ms-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : linear-gradient(to bottom,  #ffeb9c 0%,#e5d28e 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffeb9c', endColorstr='#e5d28e',GradientType=0 );
+        }
+        .grey > .x-grid-cell-inner {
+        	border     : 1px solid #cfd1d3;
+        	background : #e7ebee;
+        	background : -moz-linear-gradient(top,  #e7ebee 0%, #cfd1d3 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#e7ebee), color-stop(100%,#cfd1d3));
+        	background : -webkit-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -o-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -ms-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : linear-gradient(to bottom,  #e7ebee 0%,#cfd1d3 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#e7ebee', endColorstr='#cfd1d3',GradientType=0 );
+        }        #aIter-inputEl.x-form-field,
+        #bIter-inputEl.x-form-field {
+        	width: 205px !important;
+        }
+        
+        .half {
+        	text-align  : center;
+        	display     : inline-block;
+        	width       : 66px;
+        	white-space : nowrap;
+        }
+        .left  { float : left;  }
+        .right { float : right; }
+        
+        .qSummary {
+        	font-size   : 12px;
+        	line-height : 15px;
+        	font-style  : italic;
+        }
         
         .key_label {
         	margin-left: 10px;
-        }
-        
-        #aIter-inputEl.x-form-field,
-        #bIter-inputEl.x-form-field {
-        	width: 205px !important;
         }    </style>
 </head>
 <body></body>

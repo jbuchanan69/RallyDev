@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 3.0.6
+// RPM Heat Map - Version 3.0.7
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -355,13 +355,13 @@ Ext.define('CustomApp', {
 			}
 			var loader = Ext.create('Rally.data.WsapiDataStore', {
 				model     : 'Iteration',
-				fetch     : ['ObjectID','Name','Project'],
+				fetch     : ['ObjectID','Name','Project','UserIterationCapacities'],
 				filters   : filters,
 				listeners : {
 					load : function(store, data) {
 						if (data && data.length) {
 							Ext.Array.each(data, function(i) {
-								if (Ext.Array.indexOf(App.viewableTeams, i.raw.Project.ObjectID) != -1) {
+								if (i.raw.UserIterationCapacities.length > 0 && Ext.Array.indexOf(App.viewableTeams, i.raw.Project.ObjectID) != -1) {
 									App.viewport.iterOIDs.push(i.raw.ObjectID);
 									App.iterNameHash[i.raw.ObjectID] = i.raw.Name;
 									App.teamNameHash[i.raw.Project.ObjectID] = i.raw.Project.Name;
@@ -369,6 +369,7 @@ Ext.define('CustomApp', {
 							});
 							loader.nextPage();
 						} else {
+							console.log(App.viewport.iterOIDs.length);
 							callback();
 						}
 					}
@@ -557,25 +558,26 @@ Ext.define('CustomApp', {
 				},{
 					text      : '',
 					dataIndex : 'color',
-					width     : 27,
+					width     : 29,
+					resizable : false,
 					renderer  : function(val, meta) {
 						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red'; 
 						return '';
 					}
 				},{
-					text      : 'Extimated vs Actual Hours',
+					text      : 'Estimated vs Actual Hours',
 					dataIndex : 'actualVsEstimateRate',
-					width     : 160,
-					minWidth  : 80,
+					width     : 152,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
-						return '<div class="half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + parseInt(val * 100) + '%')) + '</div><div class="half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
+						return '<div class="left half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + parseInt(val * 100) + '%')) + '</div><div class="right half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
 					}
 				},{
 					text      : 'Remaining Hours',
 					dataIndex : 'taskRemainingTotal',
-					width     : 80,
-					minWidth  : 80,
+					width     : 76,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val) {
 						return Ext.util.Format.number(val, '0,0');
@@ -583,52 +585,52 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Accepted Story Count',
 					dataIndex : 'acptStoryCountRate',
-					width     : 160,
-					minWidth  : 80,
+					width     : 152,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-						return '<div class="half">' + parseInt(val * 100) + '%</div><div class="half">' + record.get('acptStoryCount') + ' of ' + record.get('storyCount') + '</div>';
+						return '<div class="left half">' + parseInt(val * 100) + '%</div><div class="right half">' + record.get('acptStoryCount') + ' of ' + record.get('storyCount') + '</div>';
 					}
 				},{
 					text      : 'Accepted Story Scope',
 					dataIndex : 'acptStoryScopeRate',
-					width     : 160,
-					minWidth  : 80,
+					width     : 152,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 1) ? meta.tdCls = 'green' : (val >= .5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-						return '<div class="half">' + parseInt(val * 100) + '%</div><div class="half">' + record.get('acptStoryScope') + ' of ' + record.get('storyScope') + '</div>';
+						return '<div class="left half">' + parseInt(val * 100) + '%</div><div class="right half">' + record.get('acptStoryScope') + ' of ' + record.get('storyScope') + '</div>';
 					}
 				},{
 					text      : 'Blocks',
 					dataIndex : 'blockCount',
-					width     : 80,
-					minWidth  : 80,
+					width     : 76,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-						return '<div class="half">' + val + '</div>';
+						return val;
 					}
 				},{
 					text      : 'Open Defects',
 					dataIndex : 'openDefectCount',
-					width     : 80,
-					minWidth  : 80,
+					width     : 76,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-						return '<div class="half">' + val + '</div>';
+						return val;
 					}
 				},{
 					text      : 'Scope Change',
 					dataIndex : 'scopeChangeRate',
-					width     : 160,
-					minWidth  : 80,
+					width     : 152,
+					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
 						(val <= .1 && val >= -.1) ? meta.tdCls = 'green' : (val <= .25 && val >= -.25) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-						return '<div class="half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + Ext.util.Format.number(val * 100, '0,0') + '%')) + '</div><div class="half">' + record.get('initStoryScope') + ' &rArr; ' + record.get('storyScope') + '</div>';
+						return '<div class="left half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + Ext.util.Format.number(val * 100, '0,0') + '%')) + '</div><div class="right half">' + record.get('initStoryScope') + ' &rArr; ' + record.get('storyScope') + '</div>';
 					}
 				}],
 				listeners: {
@@ -745,7 +747,8 @@ Ext.define('CustomApp', {
 									columnCfgs        : [{
 										text      : '',
 										dataIndex : 'color',
-										width     : 27,
+										width     : 29,
+										resizable : false,
 										align     : 'center',
 										renderer  : function(val, meta, record) {
 											(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'red' : (val == 2) ? meta.tdCls = 'yellow' : null;
