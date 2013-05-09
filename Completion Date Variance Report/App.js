@@ -1,4 +1,4 @@
-// Completion Date Variance Report - Version 0.3
+// Completion Date Variance Report - Version 0.4
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -425,7 +425,7 @@ Ext.define('CustomApp', {
 					columnCfgs : [{
 						text      : 'ID',
 						dataIndex : '_UnformattedID',
-						width     : 55,
+						width     : 60,
 						align     : 'right',
 						renderer  : function(val, meta, record) {
 							switch (record.get('PortfolioItemTypeName')) {
@@ -439,11 +439,11 @@ Ext.define('CustomApp', {
 						text      : 'Name',
 						dataIndex : 'Name',
 						flex      : 1,
-						minWidth  : 110
+						minWidth  : 100
 					},{
 						text      : 'Percent of Backlog Estimated',
 						dataIndex : 'BacklogEstimatedRate',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val, meta) {
 							if (val == -1) {
@@ -457,7 +457,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'User Story Count',
 						dataIndex : 'LeafStoryCount',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val) {
 							return Ext.util.Format.number(val, '0,0');
@@ -465,7 +465,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Total Plan Estimate',
 						dataIndex : 'LeafStoryPlanEstimateTotal',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val) {
 							return Ext.util.Format.number(val, '0,0');
@@ -473,7 +473,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Percent Complete (By Plan Estimate)',
 						dataIndex : 'PercentDoneByStoryPlanEstimate',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val) {
 							return Ext.util.Format.number(val * 100, '0,0.0') + '%';
@@ -481,7 +481,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Remaining Plan Estimate',
 						dataIndex : 'LeafStoryRemainingPlanEstimateTotal',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val) {
 							return Ext.util.Format.number(val, '0,0');
@@ -489,7 +489,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Average Velocity (By Iteration)',
 						dataIndex : 'Velocity',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val) {
 							return Ext.util.Format.number(val, '0,0.0');
@@ -497,33 +497,33 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Planned Start Date',
 						dataIndex : 'PlannedStartDate',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
-						renderer  : function(val, meta) {
-							if (!val) {
+						renderer  : function(val, meta, record) {
+							if (!record.raw.PlannedStartDate) {
 								meta.tdCls = 'grey';
 								return 'N/A';
 							} else {
-								return val.substring(0,10);
+								return record.raw.PlannedStartDate.substring(0,10);
 							}
 						}
 					},{
 						text      : 'Planned End Date',
 						dataIndex : 'PlannedEndDate',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
-						renderer  : function(val, meta) {
-							if (!val) {
+						renderer  : function(val, meta, record) {
+							if (!record.raw.PlannedEndDate) {
 								meta.tdCls = 'grey';
 								return 'N/A';
 							} else {
-								return val.substring(0,10);
+								return record.raw.PlannedEndDate.substring(0,10);
 							}
 						}
 					},{
 						text      : 'Forecasted Completion Date',
 						dataIndex : 'ForecastedCompletionDate',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val, meta) {
 							if (val == 'N/A') {
@@ -539,7 +539,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Iterations Required for Completion',
 						dataIndex : 'RemainingIterations',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val, meta) {
 							if (val == -1) {
@@ -552,7 +552,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'Completion Iteration Variance',
 						dataIndex : 'CompletionIterationVariance',
-						width     : 110,
+						width     : 80,
 						align     : 'center',
 						renderer  : function(val, meta) {
 							if (val == -1000000) {
