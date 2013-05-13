@@ -1,0 +1,8 @@
+.half {
+	text-align  : center;
+	display     : inline-block;
+	width       : 50px;
+	white-space : nowrap;
+}
+.left  { float : left;  }
+.right { float : right; }
