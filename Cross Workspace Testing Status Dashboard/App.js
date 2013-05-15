@@ -1,4 +1,4 @@
-// Cross Workspace Testing Status Dashboard - Version 2.2
+// Cross Workspace Testing Status Dashboard - Version 2.3
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -78,11 +78,14 @@ Ext.define('CustomApp', {
 				modelType  : 'Tag',
 				fieldLabel : 'Tags:',
 				labelWidth : 25,
-				width      : 300,
+				width      : 200,
 				margins    : '0 0 0 15',
 				listeners  : {
                     blur: function() {
                         this.collapse();
+                    },
+                    focus: function() {
+                    	this.expand();
                     },
                     selectionchange : function() {
                     	var title = '';
@@ -91,6 +94,7 @@ Ext.define('CustomApp', {
                     	});
                     	this.setRawValue(title);
                     	this.changedValue = true;
+                    	this.collapse();
                     },
                     collapse: function () {
                     	if (this.changedValue) {
@@ -105,7 +109,7 @@ Ext.define('CustomApp', {
 			}]
 		},{
 			xtype    : 'container',
-			width    : 315,
+			width    : 420,
 			layout   : 'hbox',
 			defaults : {
 				xtype   : 'button',
@@ -158,6 +162,36 @@ Ext.define('CustomApp', {
 							{ text: 'Work Item', dataIndex: 'WorkItemFID', flex: 1,    minWidth: 150,   renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('WorkItemOID') + '"><b>' + val + ':</b></a> ' + record.get('WorkItemName'); } }
 						]);
 					});
+				}
+			},{
+				text    : 'Export',
+				handler : function(event, toolEl, panel) {
+			    	Ext.onReady(function() {
+			    		if (/*@cc_on!@*/0) { //Exporting to Excel not supported in IE
+				            Ext.Msg.alert('Error', 'Exporting to CSV is not supported in Internet Explorer. Please switch to a different browser and try again.');
+				        } else if (App.down('#rally_grid')) {
+	                    	Ext.getBody().mask('Exporting Chart...');
+		                    setTimeout(function() {
+		                        var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>{table}</table></body></html>';
+		                        var base64   = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+		                        var format   = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+		                        var table    = document.getElementById('rally_grid');
+
+		                        var excel_data = '<tr>';
+		                        Ext.Array.each(table.innerHTML.match(/<span .*?x-column-header-text.*?>.*?<\/span>/gm), function(column_header_span) {
+		                            excel_data += (column_header_span.replace(/span/g,'td'));
+		                        });
+		                        excel_data += '</tr>';
+		                        Ext.Array.each(table.innerHTML.match(/<tr class="x-grid-row.*?<\/tr>/gm), function(line) {
+		                        	if (!line.match(/x-grid-row-summary/)) excel_data += line.replace(/___/g,' ');
+		                        });
+
+		                        var ctx = {worksheet: name || 'Worksheet', table: excel_data};
+		                        window.location.href = 'data:application/vnd.ms-excel;base64,' + base64(format(template, ctx));
+		                        Ext.getBody().unmask();
+		                    }, 500);
+	                    }
+	                });
 				}
 			}]
 		}]
@@ -272,32 +306,29 @@ Ext.define('CustomApp', {
 					App.down('#viewport').removeAll();
 					Ext.Msg.alert('Error', 'No data was found matching the specified query criteria.');
 				} else {
-					var OIDFilter = [],
-						remaining = 0;
+					var defectOIDFilter   = [],
+						testCaseOIDFilter = [],
+						remaining         = 0;
 					Ext.Array.each(testCaseOIDs, function(o, k) {
-						OIDFilter.push({
+						testCaseOIDFilter.push({
 							property : 'ObjectID',
 							value    : o
 						});
-						if (k == testCaseOIDs.length - 1) {
+						if (testCaseOIDFilter.length >= 100 || k == testCaseOIDs.length - 1) {
 							remaining++;
-							loadDetail('TestCase', OIDFilter);
-							OIDFilter = [];
-							Ext.Array.each(defectOIDs, function(o, k) {
-								OIDFilter.push({
-									property : 'ObjectID',
-									value    : o
-								});
-								if (OIDFilter.length == 100 || k == defectOIDs.length - 1) {
-									remaining++;
-									loadDetail('Defect', OIDFilter);
-									OIDFilter = [];
-								}
-							});
-						} else if (OIDFilter.length == 100) {
+							loadDetail('TestCase', testCaseOIDFilter);
+							testCaseOIDFilter = [];
+						}
+					});
+					Ext.Array.each(defectOIDs, function(o, k) {
+						defectOIDFilter.push({
+							property : 'ObjectID',
+							value    : o
+						});
+						if (defectOIDFilter.length == 100 || k == defectOIDs.length - 1) {
 							remaining++;
-							loadDetail('TestCase', OIDFilter);
-							OIDFilter = [];
+							loadDetail('Defect', defectOIDFilter);
+							defectOIDFilter = [];
 						}
 					});
 				}
@@ -389,6 +420,7 @@ Ext.define('CustomApp', {
 			App.down('#viewport').removeAll();
 			App.down('#viewport').add({
 				xtype             : 'rallygrid',
+				id                : 'rally_grid',
 				disableSelection  : true,
 				showPagingToolbar : false,
 				store             : Ext.create('Rally.data.custom.Store', {
@@ -398,17 +430,86 @@ Ext.define('CustomApp', {
 						{ property: 'Team', direction: 'ASC' }
 					]
 				}),
-				columnCfgs: [
-					{ text: 'Team',                    dataIndex: 'Team',           width: 300                 },
-					{ text: 'Total Test Cases',        dataIndex: 'TC_Count',       flex: 1,   align: 'center' },
-					{ text: 'Test Cases Not Run',      dataIndex: 'TC_NotRunCount', flex: 1,   align: 'center' },
-					{ text: 'Passed Test Cases',       dataIndex: 'TC_PassedCount', flex: 1,   align: 'center' },
-					{ text: 'Failed Test Cases',       dataIndex: 'TC_FailedCount', flex: 1,   align: 'center' },
-					{ text: 'Inconclusive Test Cases', dataIndex: 'TC_PassedCount', flex: 1,   align: 'center' },
-					{ text: 'Total Defects',           dataIndex: 'DE_Count',       flex: 1,   align: 'center' },
-					{ text: 'Open Defects',            dataIndex: 'DE_OpenCount',   flex: 1,   align: 'center' },
-					{ text: 'Closed Defects',          dataIndex: 'DE_ClosedCount', flex: 1,   align: 'center' }
-				]
+				features : [{
+					ftype : 'summary'
+				}],
+				columnCfgs: [{
+					text            : 'Team',
+					dataIndex       : 'Team',
+					width           : 300
+				},{ 
+					text            : 'Total Test Cases',
+					dataIndex       : 'TC_Count',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{ 
+					text            : 'Test Cases Not Run',
+					dataIndex       : 'TC_NotRunCount',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{ 
+					text            : 'Passed Test Cases',
+					dataIndex       : 'TC_PassedCount',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{ 
+					text            : 'Failed Test Cases',
+					dataIndex       : 'TC_FailedCount',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{
+					text            : 'Inconclusive Test Cases',
+					dataIndex       : 'TC_InconclusiveCount',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{ 
+					text            : 'Total Defects',
+					dataIndex       : 'DE_Count',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{ 
+					text            : 'Open Defects',
+					dataIndex       : 'DE_OpenCount',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				},{ 
+					text            : 'Closed Defects',
+					dataIndex       : 'DE_ClosedCount',
+					flex            : 1,
+					align           : 'center',
+					summaryType     : 'sum',
+					summaryRenderer : function(val, data, idx) {
+		                return '<b>' + Ext.util.Format.number(val, '0,0') + '</b>';
+		            }
+				}]
 			});
 		},
 
@@ -416,6 +517,7 @@ Ext.define('CustomApp', {
 			App.down('#viewport').removeAll();
 			App.down('#viewport').add({
 				xtype             : 'rallygrid',
+				id                : 'rally_grid',
 				disableSelection  : true,
 				showPagingToolbar : false,
 				store             : Ext.create('Rally.data.custom.Store', {

@@ -11,3 +11,10 @@
 .activeButton {
 	background: #666;
 }
+
+#tagPicker .x-trigger-cell {
+	display: none !important;
+}
+#tagPicker .x-form-item-body {
+	border-right: 1px solid #C6C6C6 !important;
+}
