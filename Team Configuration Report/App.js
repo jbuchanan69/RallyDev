@@ -1,4 +1,4 @@
-// Team Configuration Report - Version 0.5.3
+// Team Configuration Report - Version 0.5.5
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -348,9 +348,11 @@ Ext.define('CustomApp', {
 						unestimatedStories : 0
 					};
 				}
-				if (App.viewport.rpmStories[i].PlanEstimate == 0) {
-					App.viewport.unestimatedStories.push(App.viewport.rpmStories[i]);
-					App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project].unestimatedStories++;
+				if (App.viewport.rpmStories[i].PlanEstimate  == 0 &&
+					App.viewport.rpmStories[i].ScheduleState != 0 &&
+					App.viewport.rpmStories[i].ScheduleState != 4) {
+						App.viewport.unestimatedStories.push(App.viewport.rpmStories[i]);
+						App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project].unestimatedStories++;
 				}
 				if (App.viewport.taggedStories[i] === undefined) {
 					App.viewport.untaggedStories.push(App.viewport.rpmStories[i]);
@@ -369,9 +371,11 @@ Ext.define('CustomApp', {
 				if (App.viewport.rpmStories[i] === undefined) {
 					App.viewport.unparentedStories.push(App.viewport.taggedStories[i]);
 					App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unparentedStories++;
-					if (App.viewport.taggedStories[i].PlanEstimate == 0) {
-						App.viewport.unestimatedStories.push(App.viewport.taggedStories[i]);
-						App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unestimatedStories++;
+					if (App.viewport.taggedStories[i].PlanEstimate  == 0 &&
+						App.viewport.taggedStories[i].ScheduleState != 0 &&
+						App.viewport.taggedStories[i].ScheduleState != 4) {
+							App.viewport.unestimatedStories.push(App.viewport.taggedStories[i]);
+							App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unestimatedStories++;
 					}
 				}
 			}
@@ -399,7 +403,7 @@ Ext.define('CustomApp', {
 					},{
 						text      : 'ID',
 						dataIndex : '_UnformattedID',
-						width     : 60,
+						width     : 80,
 						renderer  : function(val, meta, record) {
 							return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('ObjectID') + '">US' + val + '</a>';
 						}
@@ -407,16 +411,16 @@ Ext.define('CustomApp', {
 						text      : 'Name',
 						dataIndex : 'Name',
 						flex      : 1,
-						minWidth  : 150
+						minWidth  : 160
 					},{
-						text      : 'Plan Est',
+						text      : 'Plan Estimate',
 						dataIndex : 'PlanEstimate',
-						width     : 80,
+						width     : 160,
 						align     : 'center'
 					},{
 						text      : 'State',
 						dataIndex : 'ScheduleState',
-						width     : 80,
+						width     : 160,
 						align     : 'center',
 						renderer  : function(val) {
 							return ['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'][val];
@@ -428,11 +432,11 @@ Ext.define('CustomApp', {
 					text      : 'Team',
 					dataIndex : 'Team',
 					flex      : 1,
-					minWidth  : 200
+					minWidth  : 160
 				},{
 					text      : 'Unparented User Stories',
 					dataIndex : 'unparentedStories',
-					width     : 140,
+					width     : 160,
 					align     : 'center',
 					renderer  : function(val, meta) {
 						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -441,7 +445,7 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Untagged User Stories',
 					dataIndex : 'untaggedStories',
-					width     : 140,
+					width     : 160,
 					align     : 'center',
 					renderer  : function(val, meta) {
 						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -450,7 +454,7 @@ Ext.define('CustomApp', {
 				},{
 					text      : 'Unestimated User Stories',
 					dataIndex : 'unestimatedStories',
-					width     : 140,
+					width     : 160,
 					align     : 'center',
 					renderer  : function(val, meta) {
 						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';

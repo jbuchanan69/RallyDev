@@ -7,7 +7,7 @@
 
     <script type="text/javascript">
         Rally.onReady(function() {
-            // Team Configuration Report - Version 0.5.3
+            // Team Configuration Report - Version 0.5.5
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
@@ -357,9 +357,11 @@
             						unestimatedStories : 0
             					};
             				}
-            				if (App.viewport.rpmStories[i].PlanEstimate == 0) {
-            					App.viewport.unestimatedStories.push(App.viewport.rpmStories[i]);
-            					App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project].unestimatedStories++;
+            				if (App.viewport.rpmStories[i].PlanEstimate  == 0 &&
+            					App.viewport.rpmStories[i].ScheduleState != 0 &&
+            					App.viewport.rpmStories[i].ScheduleState != 4) {
+            						App.viewport.unestimatedStories.push(App.viewport.rpmStories[i]);
+            						App.viewport.dashboardDataObj[App.viewport.rpmStories[i].Project].unestimatedStories++;
             				}
             				if (App.viewport.taggedStories[i] === undefined) {
             					App.viewport.untaggedStories.push(App.viewport.rpmStories[i]);
@@ -378,9 +380,11 @@
             				if (App.viewport.rpmStories[i] === undefined) {
             					App.viewport.unparentedStories.push(App.viewport.taggedStories[i]);
             					App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unparentedStories++;
-            					if (App.viewport.taggedStories[i].PlanEstimate == 0) {
-            						App.viewport.unestimatedStories.push(App.viewport.taggedStories[i]);
-            						App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unestimatedStories++;
+            					if (App.viewport.taggedStories[i].PlanEstimate  == 0 &&
+            						App.viewport.taggedStories[i].ScheduleState != 0 &&
+            						App.viewport.taggedStories[i].ScheduleState != 4) {
+            							App.viewport.unestimatedStories.push(App.viewport.taggedStories[i]);
+            							App.viewport.dashboardDataObj[App.viewport.taggedStories[i].Project].unestimatedStories++;
             					}
             				}
             			}
@@ -408,7 +412,7 @@
             					},{
             						text      : 'ID',
             						dataIndex : '_UnformattedID',
-            						width     : 60,
+            						width     : 80,
             						renderer  : function(val, meta, record) {
             							return '<a href="https://rally1.rallydev.com/#/detail/userstory/' + record.get('ObjectID') + '">US' + val + '</a>';
             						}
@@ -416,16 +420,16 @@
             						text      : 'Name',
             						dataIndex : 'Name',
             						flex      : 1,
-            						minWidth  : 150
+            						minWidth  : 160
             					},{
-            						text      : 'Plan Est',
+            						text      : 'Plan Estimate',
             						dataIndex : 'PlanEstimate',
-            						width     : 80,
+            						width     : 160,
             						align     : 'center'
             					},{
             						text      : 'State',
             						dataIndex : 'ScheduleState',
-            						width     : 80,
+            						width     : 160,
             						align     : 'center',
             						renderer  : function(val) {
             							return ['Initial Version', 'Defined', 'In-Progress', 'Completed', 'Accepted'][val];
@@ -437,11 +441,11 @@
             					text      : 'Team',
             					dataIndex : 'Team',
             					flex      : 1,
-            					minWidth  : 200
+            					minWidth  : 160
             				},{
             					text      : 'Unparented User Stories',
             					dataIndex : 'unparentedStories',
-            					width     : 140,
+            					width     : 160,
             					align     : 'center',
             					renderer  : function(val, meta) {
             						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -450,7 +454,7 @@
             				},{
             					text      : 'Untagged User Stories',
             					dataIndex : 'untaggedStories',
-            					width     : 140,
+            					width     : 160,
             					align     : 'center',
             					renderer  : function(val, meta) {
             						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -459,7 +463,7 @@
             				},{
             					text      : 'Unestimated User Stories',
             					dataIndex : 'unestimatedStories',
-            					width     : 140,
+            					width     : 160,
             					align     : 'center',
             					renderer  : function(val, meta) {
             						(val == 0) ? meta.tdCls = 'green' : (val <= 5) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
@@ -532,20 +536,69 @@
         	background    : linear-gradient(to bottom,  #ffff99 0%,#ffd46f 100%);
         	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
         }
-        .x-tree-icon {
-        	display : none !important;
+        
+        .x-tree-icon { display    : none    !important; }
+        
+        .btn > .x-grid-cell-inner:hover {
+        	cursor: pointer !important;
         }
+        
         .green  > .x-grid-cell-inner,
         .red    > .x-grid-cell-inner,
         .yellow > .x-grid-cell-inner,
         .grey   > .x-grid-cell-inner {
-        	border-radius : 3px !important;
-        	margin        : 3px !important;
+        	border-radius : 3px    !important;
+        	margin        : 3px    !important;
+        	text-align    : center !important; 
         }
-        .green  > .x-grid-cell-inner { background : #C6EFCE !important; }
-        .red    > .x-grid-cell-inner { background : #FFC7CE !important; }
-        .yellow > .x-grid-cell-inner { background : #FFEB9C !important; }
-        .grey   > .x-grid-cell-inner { background : #E7EBEE !important; }    </style>
+        .green > .x-grid-cell-inner {
+        	border     : 1px solid #afd3b6;
+        	background : #c6efce;
+        	background : -moz-linear-gradient(top,  #c6efce 0%, #afd3b6 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#c6efce), color-stop(100%,#afd3b6));
+        	background : -webkit-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -o-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -ms-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : linear-gradient(to bottom,  #c6efce 0%,#afd3b6 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#c6efce', endColorstr='#afd3b6',GradientType=0 );
+        }
+        .green > .x-grid-cell-inner:hover {
+        
+        }
+        
+        .red > .x-grid-cell-inner {
+        	border     : 1px solid #e5b5ba;
+        	background : #ffc7ce;
+        	background : -moz-linear-gradient(top,  #ffc7ce 0%, #e5b5ba 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffc7ce), color-stop(100%,#e5b5ba));
+        	background : -webkit-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -o-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -ms-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : linear-gradient(to bottom,  #ffc7ce 0%,#e5b5ba 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffc7ce', endColorstr='#e5b5ba',GradientType=0 );
+        }
+        .yellow > .x-grid-cell-inner {
+        	border     : 1px solid #e5d28e;
+        	background : #ffeb9c;
+        	background : -moz-linear-gradient(top,  #ffeb9c 0%, #e5d28e 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffeb9c), color-stop(100%,#e5d28e));
+        	background : -webkit-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -o-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -ms-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : linear-gradient(to bottom,  #ffeb9c 0%,#e5d28e 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffeb9c', endColorstr='#e5d28e',GradientType=0 );
+        }
+        .grey > .x-grid-cell-inner {
+        	border     : 1px solid #cfd1d3;
+        	background : #e7ebee;
+        	background : -moz-linear-gradient(top,  #e7ebee 0%, #cfd1d3 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#e7ebee), color-stop(100%,#cfd1d3));
+        	background : -webkit-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -o-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -ms-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : linear-gradient(to bottom,  #e7ebee 0%,#cfd1d3 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#e7ebee', endColorstr='#cfd1d3',GradientType=0 );
+        }    </style>
 </head>
 <body></body>
 </html>
