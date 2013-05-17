@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 3.0.7
+// RPM Heat Map - Version 3.0.9
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -185,30 +185,13 @@ Ext.define('CustomApp', {
     	App = this;
 		App.iterNameHash  = {};
 		App.teamNameHash  = {};
-		App.viewableTeams = [];
 		App.down('#viewport').addListener('resize', function() {
 			if (App.popup) {
 				App.popup.setWidth(Ext.getBody().getWidth());
 				App.popup.setHeight(Ext.getBody().getHeight());
 			}
 		});
-		var loader = Ext.create('Rally.data.WsapiDataStore', {
-			model     : 'Project',
-			fetch     : ['ObjectID'],
-			listeners : {
-				load : function(store, data) {
-					if (data && data.length) {
-						Ext.Array.each(data, function(i) {
-							App.viewableTeams.push(i.raw.ObjectID);
-						});
-						loader.nextPage();
-					} else {
-						App.rpmTree.init();
-					}
-				}
-			}
-		});
-		loader.loadPage(1);
+		App.rpmTree.init();
     },
 
     rpmTree: {
@@ -361,11 +344,9 @@ Ext.define('CustomApp', {
 					load : function(store, data) {
 						if (data && data.length) {
 							Ext.Array.each(data, function(i) {
-								if (i.raw.UserIterationCapacities.length > 0 && Ext.Array.indexOf(App.viewableTeams, i.raw.Project.ObjectID) != -1) {
-									App.viewport.iterOIDs.push(i.raw.ObjectID);
-									App.iterNameHash[i.raw.ObjectID] = i.raw.Name;
-									App.teamNameHash[i.raw.Project.ObjectID] = i.raw.Project.Name;
-								}
+								App.viewport.iterOIDs.push(i.raw.ObjectID);
+								App.iterNameHash[i.raw.ObjectID] = i.raw.Name;
+								App.teamNameHash[i.raw.Project.ObjectID] = i.raw.Project.Name;
 							});
 							loader.nextPage();
 						} else {
@@ -412,10 +393,6 @@ Ext.define('CustomApp', {
 					property : 'Iteration',
 					operator : '!=',
 					value    : null
-				},{
-					property : 'Project',
-					operator : 'in',
-					value    : App.viewableTeams
 				}],
 				listeners : {
 					load : function(store, data, success) {
@@ -486,10 +463,6 @@ Ext.define('CustomApp', {
 					property : 'ObjectID',
 					operator : 'in',
 					value    : App.viewport.defectOIDs
-				},{
-					property : 'Project',
-					operator : 'in',
-					value    : App.viewableTeams
 				}],
 				listeners : {
 					load : function(store, data, success) {
@@ -550,7 +523,7 @@ Ext.define('CustomApp', {
 					text        : 'Team',
 					dataIndex   : 'teamName',
 					flex        : 1,
-					minWidth    : 190,
+					minWidth    : 180,
 					summaryType : function() {
 					return '<div class="qSummary">' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.name + '<br />' + App.down('#aIter').getRawValue() + ((App.down('#queryTypePicker').getValue() == true) ? '<br />' + App.down('#bIter').getRawValue() : '') + '</div>';
 				}
@@ -608,7 +581,7 @@ Ext.define('CustomApp', {
 					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
-						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow btn' : meta.tdCls = 'red btn';
 						return val;
 					}
 				},{
@@ -618,7 +591,7 @@ Ext.define('CustomApp', {
 					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
-						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						(val == 0) ? meta.tdCls = 'green' : (val == 1) ? meta.tdCls = 'yellow btn' : meta.tdCls = 'red btn';
 						return val;
 					}
 				},{
@@ -628,7 +601,7 @@ Ext.define('CustomApp', {
 					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
-						(val <= .1 && val >= -.1) ? meta.tdCls = 'green' : (val <= .25 && val >= -.25) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
+						(val <= .1 && val >= -.1) ? meta.tdCls = 'green btn' : (val <= .25 && val >= -.25) ? meta.tdCls = 'yellow btn' : meta.tdCls = 'red btn';
 						return '<div class="left half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + Ext.util.Format.number(val * 100, '0,0') + '%')) + '</div><div class="right half">' + record.get('initStoryScope') + ' &rArr; ' + record.get('storyScope') + '</div>';
 					}
 				}],
@@ -652,7 +625,7 @@ Ext.define('CustomApp', {
 									columnCfgs        : [
 										{ text: 'ID',              dataIndex: '_UnformattedID', width: 60, renderer: function(val) { return 'US' + val; } },
 										{ text: 'Name',            dataIndex: 'Name',           flex: 1                                                   },
-										{ text: 'Blocking Reason', dataIndex: 'BlockedReason',  flex: 1,                                                  },
+										{ text: 'Blocking Reason', dataIndex: 'BlockedReason',  flex: 1                                                   },
 										{ text: 'Plan Estimate',   dataIndex: 'PlanEstimate',   width: 60,  align: 'center'                               },
 										{ text: 'State',           dataIndex: 'ScheduleState',  width: 125, align: 'center'                               }
 									],
