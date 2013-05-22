@@ -1,13 +1,21 @@
-.green       { background : #C6EFCE !important }
-.red         { background : #FFC7CE !important }
-.yellow      { background : #FFEB9C !important }
-.grey        { background : #E7EBEE !important }
+#toolbar {
+	padding: 5px;
+}
 
-td .x-grid-cell {
-	vertical-align: middle !important;
+#min_iter-inputEl.x-form-field,
+#max_iter-inputEl.x-form-field {
+	width: 160px !important;
+}
+
+.combobox-right-arrow {
+	display: none !important;
 }
 
 .half {
-	display : inline-block;
-	width   : 80px;
+	text-align  : center;
+	display     : inline-block;
+	width       : 71px;
+	white-space : nowrap;
 }
+.left  { float : left;  }
+.right { float : right; }
