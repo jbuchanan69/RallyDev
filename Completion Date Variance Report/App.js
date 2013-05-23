@@ -1,4 +1,4 @@
-// Completion Date Variance Report - Version 0.4
+// Completion Date Variance Report - Version 0.4.2
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -106,7 +106,7 @@ Ext.define('CustomApp', {
 						Ext.Array.each(App.down('#iterPicker').store.data.items, function(n, k) {
 							if (n.raw.Name == App.down('#iterPicker').getRawValue()) App.currentIterationIdx = k;
 						});
-						for (var i = 0; i < 6; i++) {
+						for (var i = 0; i < 4; i++) {
 							App.velocityLookbackDates.push(App.down('#iterPicker').store.data.items[App.currentIterationIdx + i].raw.StartDate);
 						}
 					});
@@ -319,17 +319,22 @@ Ext.define('CustomApp', {
 									for (var i = 0; i < nodeObj[n].AcceptedScopeTrend.length - 1; i++) {
 										diffs.push(nodeObj[n].AcceptedScopeTrend[i] - nodeObj[n].AcceptedScopeTrend[i + 1]);
 									}
-									if (diffs.length > 0 && Ext.Array.mean(diffs) > 0) {
+									if (diffs.length > 2 && Ext.Array.mean(diffs) > 0) { //Must have a velocity over the last 3 sprints
 										nodeObj[n].Velocity = Ext.Array.mean(diffs);
-										nodeObj[n].RemainingIterations = Math.ceil(nodeObj[n].LeafStoryRemainingPlanEstimateTotal / nodeObj[n].Velocity);
-										if (App.down('#iterPicker').store.data.items[App.currentIterationIdx - nodeObj[n].RemainingIterations + 1] != undefined) {
-											nodeObj[n].ForecastedCompletionDate = App.down('#iterPicker').store.data.items[App.currentIterationIdx - nodeObj[n].RemainingIterations + 1].raw.EndDate.substring(0,10);
-										} else { //Iterations not assigned for forecasted date, use current iteration end date, plus 3 weeks per estimated sprint
-											nodeObj[n].ForecastedCompletionDate = Rally.util.DateTime.toIsoString(Ext.Date.add(Rally.util.DateTime.fromIsoString(App.down('#iterPicker').store.data.items[App.currentIterationIdx].raw.EndDate), Ext.Date.DAY, 21 * Math.floor(nodeObj[n].RemainingIterations))).substring(0,10) + 'I';
+										if (nodeObj[n].PlannedStartDate > Rally.util.DateTime.toIsoString(new Date())) {
+											nodeObj[n].RemainingIterations      = -1;
+											nodeObj[n].ForecastedCompletionDate = 'N/A';
+										} else {
+											nodeObj[n].RemainingIterations = Math.ceil(nodeObj[n].LeafStoryRemainingPlanEstimateTotal / nodeObj[n].Velocity);
+											if (App.down('#iterPicker').store.data.items[App.currentIterationIdx - nodeObj[n].RemainingIterations + 1] != undefined) {
+												nodeObj[n].ForecastedCompletionDate = App.down('#iterPicker').store.data.items[App.currentIterationIdx - nodeObj[n].RemainingIterations + 1].raw.EndDate.substring(0,10);
+											} else { //Iterations not assigned for forecasted date, use current iteration end date, plus 3 weeks per estimated sprint
+												nodeObj[n].ForecastedCompletionDate = Rally.util.DateTime.toIsoString(Ext.Date.add(Rally.util.DateTime.fromIsoString(App.down('#iterPicker').store.data.items[App.currentIterationIdx].raw.EndDate), Ext.Date.DAY, 21 * Math.floor(nodeObj[n].RemainingIterations))).substring(0,10) + 'I';
+											}
 										}
 									} else {
-										nodeObj[n].Velocity = 0;
-										nodeObj[n].RemainingIterations = -1;
+										nodeObj[n].Velocity                 = 0;
+										nodeObj[n].RemainingIterations      = -1;
 										nodeObj[n].ForecastedCompletionDate = 'N/A';
 									}
 								}
