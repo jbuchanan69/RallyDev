@@ -1,4 +1,4 @@
-// RPM Heat Map - Version 3.0.9
+// RPM Heat Map - Version 3.0.10
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -135,6 +135,7 @@ Ext.define('CustomApp', {
 			flex   : 1
 		},{
 			id      : 'settingsPanel2',
+			hidden  : true,
 			layout  : 'vbox',
 			height  : 30,
 			border  : 0,
@@ -468,8 +469,29 @@ Ext.define('CustomApp', {
 					load : function(store, data, success) {
 						Ext.Array.each(data, function(i) {
 							if (i.raw.State != 'Closed' && i.raw.State != 'Fixed') {
-								App.viewport.teamData[i.raw.Project].openDefectCount++;
-								App.viewport.teamData[i.raw.Project].openDefects.push(i.raw);
+								if (App.viewport.teamData[i.raw.Project] === undefined) {
+									App.viewport.teamData[i.raw.Project] = {
+										teamName           : App.teamNameHash[i.raw.Project],
+										storyCount         : 0,
+										acptStoryCount     : 0,
+										initStoryScope     : 0,
+										storyScope         : 0,
+										acptStoryScope     : 0,
+										openDefectCount    : 1,
+										taskActualTotal    : 0,
+										taskEstimateTotal  : 0,
+										taskRemainingTotal : 0,
+										blockCount         : 0,
+										blockedStories     : [],
+										openDefects        : [i.raw],
+										defectOIDs         : [],
+										initialStories     : [],
+										finalStories       : []
+									}
+								} else {
+									App.viewport.teamData[i.raw.Project].openDefectCount++;
+									App.viewport.teamData[i.raw.Project].openDefects.push(i.raw);
+								}
 							}
 						});
 						callback();
@@ -486,7 +508,7 @@ Ext.define('CustomApp', {
 				node = App.viewport.teamData[i];
 				node.acptStoryCountRate   = parseFloat(node.acptStoryCount / node.storyCount) || 0;
 				node.acptStoryScopeRate   = parseFloat(node.acptStoryScope / node.storyScope) || 0;
-				node.actualVsEstimateRate = (node.taskEstimateTotal == 0) ? 'N/A' : parseFloat((node.taskActualTotal / node.taskEstimateTotal) - 1) || 0;
+				node.actualVsEstimateRate = (node.taskEstimateTotal == 0) ? 'N/A' : parseFloat(node.taskActualTotal / node.taskEstimateTotal) || 0;
 				node.scopeChangeRate      = (node.initStoryScope == 0) ? 'N/A' : parseFloat((node.storyScope / node.initStoryScope) - 1) || 0;
 				node.color                = (node.acptStoryCountRate == 1    &&
 											 node.acptStoryScopeRate == 1    &&
@@ -543,7 +565,7 @@ Ext.define('CustomApp', {
 					minWidth  : 76,
 					align     : 'center',
 					renderer  : function(val, meta, record) {
-						return '<div class="left half">' + ((val == 'N/A') ? val : (((val > 0) ? '+' : '') + parseInt(val * 100) + '%')) + '</div><div class="right half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
+						return '<div class="left half">' + ((val == 'N/A') ? val : parseInt(val * 100) + '%') + '</div><div class="right half">' + Ext.util.Format.number(record.get('taskEstimateTotal'), '0,0') + ' / ' + Ext.util.Format.number(record.get('taskActualTotal'), '0,0') + '</div>';
 					}
 				},{
 					text      : 'Remaining Hours',
