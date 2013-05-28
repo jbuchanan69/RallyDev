@@ -11,11 +11,16 @@
 	display: none !important;
 }
 
-.half {
+.percent {
 	text-align  : center;
 	display     : inline-block;
-	width       : 71px;
+	width       : 80px;
 	white-space : nowrap;
 }
-.left  { float : left;  }
-.right { float : right; }
+
+.chart_title {
+	text-align: center;
+	font-size: 14px;
+	font-weight: bold;
+	margin: 0 30px 0 83px;
+}

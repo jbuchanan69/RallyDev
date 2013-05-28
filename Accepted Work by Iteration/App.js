@@ -1,4 +1,4 @@
-// Accepted Work by Iteration Report - Version 0.2.1
+// Accepted Work by Iteration Report - Version 0.3.0
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -70,6 +70,7 @@ Ext.define('CustomApp', {
 
     viewport: {
     	update: function() {
+    		Ext.getBody().mask('Loading');
     		App.viewport.getIterations(function() {
     			var remaining = 0;
     			for (i in App.viewport.iterHash) {
@@ -221,13 +222,14 @@ Ext.define('CustomApp', {
 	    		App.viewport.columns.push({
 					text      : App.viewport.iterHash[i].Name,
 					dataIndex : App.viewport.iterHash[i].Name + '_rate',
-					width     : 162,
+					width     : 100,
 					resizable : false,
 					align     : 'center',
 					renderer  : function(val, meta, record, row, col) {
 						if (typeof val === 'number' && !isNaN(val)) {
 							(val >= .9) ? meta.tdCls = 'green' : (val >= .75) ? meta.tdCls = 'yellow' : meta.tdCls = 'red';
-							return '<div class="left half">' + parseInt(val * 100) + '%</div><div class="right half">' + record.get(App.viewport.columns[col].text + '_final') + ' of ' + record.get(App.viewport.columns[col].text + '_initial') + '</div>';
+							return '<div class="percent" title="' + record.get(App.viewport.columns[col].text + '_final') + ' of ' + record.get(App.viewport.columns[col].text + '_initial') + ' Points">' + parseInt(val * 100) + '%</div>';
+							//return '<div class="left half">' + parseInt(val * 100) + '%</div><div class="right half">' + record.get(App.viewport.columns[col].text + '_final') + ' of ' + record.get(App.viewport.columns[col].text + '_initial') + '</div>';
 						} else {
 							meta.tdCls = 'grey';
 							return 'N/A';
@@ -235,7 +237,7 @@ Ext.define('CustomApp', {
 					},
 					summaryType : 'average',
 					summaryRenderer : function(val) {
-						return '<b>' + Ext.util.Format.number(val * 100, '0.0') + '%</b>';
+						return '<div class="x-grid-cell ' + ((val >= .9) ? 'green' : (val >= .75) ? 'yellow' : 'red') + '" style="margin-left:-6px;width:100px;"><div class="x-grid-cell-inner"><div class="percent" style="margin:3px 2px 0 0"><b>' + Ext.util.Format.number(val * 100, '0.0') + '%</b></div></div></div>';
 					}
 	    		});
 	    	}
@@ -243,6 +245,7 @@ Ext.define('CustomApp', {
 	    },
 
 	    drawChart: function() {
+	    	Ext.getBody().unmask();
 	    	App.down('#chartContainer').removeAll();
 	    	App.down('#viewport').removeAll();
 	    	App.down('#viewport').add({
@@ -288,6 +291,12 @@ Ext.define('CustomApp', {
 							trend[i].Green = maxTrend - 40;
 						}
 						App.down('#chartContainer').removeAll();
+						App.down('#chartContainer').add({
+			                xtype  : 'container',
+			                layout : 'fit',
+			                height : 20,
+			                html   : '<div class="chart_title">"' + record.raw['TeamName'] + '" Acceptance Trend</div>'
+			            });
 			            App.down('#chartContainer').add({
 			                xtype   : 'chart',
 			                id      : 'chart',
