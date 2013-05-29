@@ -1,0 +1,12 @@
+#toolbar {
+	padding: 5px;
+}
+
+#min_iter-inputEl.x-form-field,
+#max_iter-inputEl.x-form-field {
+	width: 160px !important;
+}
+
+.combobox-right-arrow {
+	display: none !important;
+}
