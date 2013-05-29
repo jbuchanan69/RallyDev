@@ -1,28 +1,27 @@
 <!DOCTYPE html>
-<meta charset="UTF-8">
 <html>
 <head>
-		<title>RPM_BU</title>
+    <title>RPM_BU</title>
 
-		<script type="text/javascript" src="/apps/2.0p5/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.0p5/sdk.js"></script>
 
-		<script type="text/javascript">
-				Rally.onReady(function() {
-            // RPM Burnup v0.6.2
+    <script type="text/javascript">
+        Rally.onReady(function() {
+            // RPM Burnup - Version 3.1
             // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
             // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
             Ext.define('CustomApp', {
-            	extend: 'Rally.app.App',
-            	componentCls: 'app',
+                extend: 'Rally.app.App',
+                componentCls: 'app',
             
-            	layout:'border',
+                layout:'border',
                 defaults: {
-            		autoScroll : true,
-            		split      : true,
-            		margins    : '5 0 0 0'
+                    autoScroll : true,
+                    split      : true,
+                    margins    : '5 0 5 0'
                 },
                 items: [{
-                	title   : 'Project',
+                    title   : 'Project',
                     id      : 'leftPopout',
                     region  : 'west',
                     collapsible : true,
@@ -30,19 +29,19 @@
                     layout: {
                         type  : 'vbox',
                         align : 'stretch',
-                        pack  : 'start',
+                        pack  : 'start'
                     },
                     items: [{
-                        id     : 'projectTreePopout', 
+                        xtype  : 'container',
+                        id     : 'rpmTreeContainer', 
                         layout : 'fit',
-                        border : 0,
                         flex   : 1,
                         style  : {
                             borderBottom : '1px solid #99BCE8'
                         }
                     },{
                         id      : 'settings',
-                        height  : 22,
+                        height  : 75,
                         border  : 0,
                         margins : 4,
                         items: [{
@@ -51,7 +50,7 @@
                         },{
                             xtype       : 'checkbox',
                             id          : 'showFuture',
-                            fieldLabel  : 'Future Iterations:',
+                            fieldLabel  : 'Show Planned Iterations:',
                             width       : 285,
                             labelWidth  : 150,
                             labelAlign  : 'right',
@@ -59,13 +58,42 @@
                             listeners   : {
                                 change  : function() {
                                     Ext.onReady(function() {
-                                        if (App.down('#projectTree').getSelectionModel().getSelection().length > 0) App.viewport.update();
+                                        if (App.down('#rpmTree').getSelectionModel().getSelection().length > 0) App.viewport.update();
                                     });
                                 }
                             }
                         },{
-                            xtype      : 'container',
-                            id         : 'date_fields'
+                            xtype      : 'datefield',
+                            id         : 'min_date',
+                            width      : 285,
+                            showToday  : false,
+                            fieldLabel : 'Chart Start Date:',
+                            labelWidth : 150,
+                            labelAlign : 'right',
+                            value      : new Date(),
+                            listeners  : {
+                                change : function() {
+                                    Ext.onReady(function() {
+                                        if (App.datePickerListen) App.viewport.populateGrid();
+                                    });
+                                }
+                            }
+                        },{
+                            xtype      : 'datefield',
+                            id         : 'max_date',
+                            width      : 285,
+                            showToday  : false,
+                            fieldLabel : 'Chart End Date:',
+                            labelWidth : 150,
+                            labelAlign : 'right',
+                            value      : new Date(),
+                            listeners  : {
+                                change : function() {
+                                    Ext.onReady(function() {
+                                        if (App.datePickerListen) App.viewport.populateGrid();
+                                    });
+                                }
+                            }
                         }]
                     }]
                 },{
@@ -73,48 +101,51 @@
                     region : 'center'
                 }],
             
-            
-            	launch: function() {
+                launch: function() {
                     App = this;
-            		App.rpmTree.init();
-                    App.dateOverride = false;
+                    App.rpmTree.init();
+                    App.iterations.getFuture();
                     App.down('#viewport').addListener('resize', function() {
                         if (App.down('#chart')) {
-                            App.down('#chart').setWidth(Ext.get('viewport').getWidth() - 40);
+                            App.down('#chart').setWidth(Ext.get('viewport').getWidth() - 25);
                             App.down('#chart').setHeight(Ext.get('viewport').getHeight() - 40);
                         }
-                        if (App.popup) {
-                            App.popup.setWidth(Ext.getBody().getWidth());
-                            App.popup.setHeight(Ext.getBody().getHeight());
-                        }
                     });
-            	},
+                },
             
-            	rpmTree: {
+                rpmTree: {
                     init: function() {
                         Ext.create('Rally.data.WsapiDataStore', {
                             autoLoad: true,
                             model: 'PortfolioItem/Initiative',
-                            fetch: ['ActualStartDate','ActualEndDate','Children','AcceptedLeafStoryCount','LeafStoryCount','Name','ObjectID','PlannedStartDate','PlannedEndDate','UnEstimatedLeafStoryCount'],
+                            fetch: [
+                                'Children',
+                                'LeafStoryCount',
+                                'AcceptedLeafStoryCount',
+                                'Name',
+                                'ObjectID',
+                                'PlannedStartDate',
+                                'PlannedEndDate'
+                            ],
                             listeners: {
                                 load: function(store, data) {
                                     if (data.length == 0) {
+                                        App.removeAll();
+                                        Ext.getBody().unmask();
                                         Ext.Msg.alert('Error', '<div class="error">This app must be ran within a context which features Initiative Portfolio Items.<br />Please change your project scope and try again.</div>');
                                         return;
                                     } else {
                                         var roots = [];
                                         Ext.Array.each(data, function(i) {
                                             roots.push({
-                                                name     : i.raw.Name,
-                                                text     : '<span class="count">' + i.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + i.raw.Name + '</span>',
-                                                id       : i.raw.ObjectID,
-                                                leaf     : i.raw.Children == undefined || i.raw.Children.length == 0,
-                                                start    : i.raw.PlannedStartDate,
-                                                end      : i.raw.PlannedEndDate,
-                                                actStart : i.raw.ActualStartDate,
-                                                actEnd   : i.raw.ActualEndDate,
-                                                acptStr  : ((i.raw.AcceptedLeafStoryCount == 0 || i.raw.LeafStoryCount == 0) ? '0' : Math.round((i.raw.AcceptedLeafStoryCount / i.raw.LeafStoryCount) * 100)) + '% (' + i.raw.AcceptedLeafStoryCount + ' / ' + i.raw.LeafStoryCount + ')',
-                                                unEstCt  : i.raw.UnEstimatedLeafStoryCount
+                                                name   : i.raw.Name,
+                                                text   : '<span class="count">' + i.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + i.raw.Name + '</span>',
+                                                id     : i.raw.ObjectID,
+                                                leaf   : i.raw.Children == undefined || i.raw.Children.length == 0,
+                                                pStart : i.raw.PlannedStartDate,
+                                                pEnd   : i.raw.PlannedEndDate,
+                                                usCnt  : i.raw.LeafStoryCount,
+                                                acpCnt : i.raw.AcceptedLeafStoryCount
                                             });
                                         });
                                         roots.sort(function(a, b) {
@@ -127,20 +158,19 @@
                         });
             
                         function drawTree(roots) {
-                            App.down('#projectTreePopout').add({
-            					xtype       : 'treepanel',
-            					id          : 'projectTree',
-            					rootVisible : false,
-            					layout      : 'fit',
-            					margin      : '-1 0 0 0',
-            					border      : 0,
-            					store       : Ext.create('Ext.data.TreeStore', {
+                            App.down('#rpmTreeContainer').add({
+                                xtype        : 'treepanel',
+                                store        : Ext.create('Ext.data.TreeStore', {
                                     root: {
                                         expanded: true,
                                         children: roots
                                     }
                                 }),
-                                listeners     : {
+                                id           : 'rpmTree',
+                                rootVisible  : false,
+                                margin       : '-1 0 0 0',
+                                border       : 0,
+                                listeners    : {
                                     beforeitemexpand: function(node) {
                                         if (node.hasChildNodes() == false) { // Child nodes have not been populated yet
                                             getChildren('Rollup', function(rollup_children) {
@@ -148,16 +178,14 @@
                                                     var children = [];
                                                     Ext.Array.each(rollup_children.concat(feature_children), function(c) {
                                                         children.push({
-            											    name     : c.raw.Name,
-                                                            text     : '<span class="count">' + c.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + c.raw.Name + '</span>',
-                                                            id       : c.raw.ObjectID,
-                                                            leaf     : c.raw.Children == undefined || c.raw.Children.length == 0,
-                                                            start    : c.raw.PlannedStartDate,
-                                                            end      : c.raw.PlannedEndDate,
-                                                            actStart : c.raw.ActualStartDate,
-                                                            actEnd   : c.raw.ActualEndDate,
-                                                            acptStr  : ((c.raw.AcceptedLeafStoryCount == 0 || c.raw.LeafStoryCount == 0) ? '0' : Math.round((c.raw.AcceptedLeafStoryCount / c.raw.LeafStoryCount) * 100)) + '% (' + c.raw.AcceptedLeafStoryCount + ' / ' + c.raw.LeafStoryCount + ')',
-                                                            unEstCt  : c.raw.UnEstimatedLeafStoryCount
+                                                            name   : c.raw.Name,
+                                                            text   : '<span class="count">' + c.raw.LeafStoryCount + '</span> - <span class="nodeTitle">' + c.raw.Name + '</span>',
+                                                            id     : c.raw.ObjectID,
+                                                            leaf   : c.raw.Children == undefined || c.raw.Children.length == 0,
+                                                            pStart : c.raw.PlannedStartDate,
+                                                            pEnd   : c.raw.PlannedEndDate,
+                                                            usCnt  : c.raw.LeafStoryCount,
+                                                            acpCnt : c.raw.AcceptedLeafStoryCount
                                                         });
                                                     });
                                                     Ext.Array.each(children.sort(function(a, b) {
@@ -171,439 +199,437 @@
             
                                         function getChildren(child_type, callback) {
                                             Ext.create('Rally.data.WsapiDataStore', {
-                                                autoLoad: true,
-                                                model: 'PortfolioItem/' + child_type,
-                                                filters: [{
-                                                    property: 'Parent.ObjectID',
-                                                    value: node.raw.id
+                                                autoLoad : true,
+                                                model    : 'PortfolioItem/' + child_type,
+                                                filters  : [{
+                                                    property : 'Parent.ObjectID',
+                                                    value    : node.raw.id
                                                 }],
-                                                fetch: ['ActualStartDate','ActualEndDate','Children','AcceptedLeafStoryCount','LeafStoryCount','Name','ObjectID','PlannedStartDate','PlannedEndDate','UnEstimatedLeafStoryCount'],
-                                                listeners: {
+                                                fetch: [
+                                                    'Children',
+                                                    'LeafStoryCount',
+                                                    'AcceptedLeafStoryCount',
+                                                    'Name',
+                                                    'ObjectID',
+                                                    'PlannedStartDate',
+                                                    'PlannedEndDate'
+                                                ],
+                                                listeners : {
                                                     load: function(store, data) {
                                                         callback(data);
                                                     }
                                                 }
                                             });
                                         }
+            
                                     },
                                     selectionchange: function() {
-                                        App.dateOverride = false;
                                         App.viewport.update();
                                     }
                                 }
                             });
+                            
                         }
                     }
                 },
             
-                viewport: {
-                	update: function() {
-                        Ext.getBody().mask('Loading: 0%');
-                        //Display project info in panel
-                        var info = App.down('#projectTree').getSelectionModel().getSelection()[0].raw;
-                        App.down('#settings').setHeight(160);
-                        App.down('#rpm_level_info').update({
-                            html: '<div class="info_title">Planned Start Date:</div>'        + ((info.start) ? info.start.substring(0,10) : 'N/A')       + '<br /> \
-                                   <div class="info_title">Planned End Date:</div>'          + ((info.end) ? info.end.substring(0,10) : 'N/A')           + '<br /> \
-                                   <div class="info_title">Actual Start Date:</div>'         + ((info.actStart) ? info.actStart.substring(0,10) : 'N/A') + '<br /> \
-                                   <div class="info_title">Actual End Date:</div>'           + ((info.actEnd) ? info.actEnd.substring(0,10) : 'N/A')     + '<br /> \
-                                   <div class="info_title">Unestimated User Stories: </div>' + Ext.util.Format.number(info.unEstCt, '0,000')             + '<br /> \
-                                   <div class="info_title">Acceptance Rate:</div>'           + info.acptStr
-                                   
-                                   
-                        });
-                        //Set date range for querying
-                        var qDates = [],
-                            xStart = null,
-                            xEnd   = null;
-                        if (App.dateOverride) {
-                            xStart = App.down('#min_date').getValue();
-                            xEnd   = App.down('#max_date').getValue();
-                        } else {
-                            xStart = App.down('#projectTree').getSelectionModel().getSelection()[0].raw.start,
-                            xEnd   = App.down('#projectTree').getSelectionModel().getSelection()[0].raw.end;
-                            if (!xStart || !xEnd) {
-                                xStart = Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(), Ext.Date.DAY, -30));
-                                xEnd   = Rally.util.DateTime.toIsoString(new Date());
-                            }
-                            xStart = Rally.util.DateTime.fromIsoString(xStart);
-                            xEnd   = Rally.util.DateTime.fromIsoString(xEnd);
-                            if (App.down('#showFuture').getValue() == false && xEnd > new Date()) xEnd = new Date(); // Don't worry about the future
-                            //Add date pickers
-                            App.down('#date_fields').removeAll();
-                            App.down('#date_fields').add({
-                                xtype      : 'datefield',
-                                id         : 'min_date',
-                                width      : 285,
-                                showToday  : false,
-                                fieldLabel : 'Chart Start Date:',
-                                labelWidth : 150,
-                                labelAlign : 'right',
-                                value      : xStart,
-                                listeners  : {
-                                    change : function() {
-                                        App.dateOverride = true;
-                                        App.viewport.update();
-                                    }
-                                }
-                            });
-                            App.down('#date_fields').add({
-                                xtype      : 'datefield',
-                                id         : 'max_date',
-                                width      : 285,
-                                showToday  : false,
-                                fieldLabel : 'Chart End Date:',
-                                labelWidth : 150,
-                                labelAlign : 'right',
-                                value      : xEnd,
-                                listeners  : {
-                                    change : function() {
-                                        App.dateOverride = true;
-                                        App.viewport.update();
-                                    }
-                                }
-                            });
-                        }
-                        
-                        //Fill array for query dates and call queries on each date
-                        var queryDelta = parseInt((xEnd.getTime() - xStart.getTime()) / 50);
-                        if (queryDelta < 86400000) queryDelta = 86400000; //One day
-                        while (xStart <= xEnd) {
-                            qDates.push(Rally.util.DateTime.toIsoString(xStart));
-                            xStart = Ext.Date.add(xStart, Ext.Date.MILLI, queryDelta);
-                        }
-                        // if (xStart != xEnd) qDates.push(Rally.util.DateTime.toIsoString(xEnd));
-                        var remaining = qDates.length;
-                        if (remaining == 0) {
-                            drawChart();
-                        } else {
-                            var initial = remaining;
-                            Ext.Array.each(qDates, function(d, k) {
-                                getPointsOn(d, function(totalPoints, acceptedPoints, storyData) {
-                                    qDates[k] = {
-                                        date     : d.substring(0,10),
-                                        dateStr  : d,
-                                        Total    : totalPoints,
-                                        Accepted : acceptedPoints,
-                                        Stories  : storyData,
-                                        Color    : 'rgb(92,154,203)'
-                                    };
-                                    Ext.getBody().mask('Loading: ' + parseInt((1 - (remaining / initial)) * 100) + '%');
-                                    if (!--remaining) (App.down('#showFuture').getValue()) ? getFutureTotals() : drawChart();
-                                });
-                            });
-                        }
-                        
-                        function getFutureTotals() {
-                            xStart = Rally.util.DateTime.toIsoString(new Date());
-                            xEnd   = Rally.util.DateTime.toIsoString(App.down('#max_date').getValue());
-                            
-                            if (xStart > xEnd || qDates[qDates.length - 1].Stories.length == 0) {
-                                drawChart();
-                                return;
-                            } //No future iterations in project range
-            
-                            var iterOIDs   = [];
-                            var iterFilter = [];
-                            var iterHash   = {};
-                            var iterPoints = {};
-                            var remaining  = 0;
-                            Ext.Array.each(qDates[qDates.length - 1].Stories, function(s, k) {
-                                if (s.Iteration && Ext.Array.indexOf(iterOIDs, s.Iteration) == -1) {
-                                    iterOIDs.push(s.Iteration);
-                                    iterFilter.push({
-                                        property : 'ObjectID',
-                                        value    : s.Iteration
-                                    });
-                                }
-                                if (iterFilter.length == 75 || k == qDates[qDates.length - 1].Stories.length - 1) {
-                                    getIters();
-                                    iterFilter = [];
-                                    remaining++;
-                                }
-                            });
-                            
-                            function getIters() {
-                                Ext.create('Rally.data.WsapiDataStore', {
-                                    autoLoad : true,
-                                    model    : 'Iteration',
-                                    fetch    : ['Name','ObjectID','StartDate'],
-                                    filters  : Rally.data.QueryFilter.and([
-                                        { property: 'EndDate', operator: '>=', value: xStart },
-                                        { property: 'EndDate', operator: '<=', value: xEnd   },
-                                        Rally.data.QueryFilter.or(iterFilter)
-                                    ]),
-                                    listeners: {
-                                        load : function(store, data) {
-                                            Ext.Array.each(data, function(i) {
-                                                iterHash[i.raw.ObjectID] = {
-                                                    Name  : i.raw.Name,
-                                                    Start : i.raw.StartDate
-                                                };
-                                            });
-                                            if (!--remaining) processIterPoints();
-                                        }
-                                    }
-                                });
-                            }
-            
-                            function processIterPoints() {
-                                Ext.Array.each(qDates[qDates.length - 1].Stories, function(s) {
-                                    if (s.Iteration != undefined && iterHash[s.Iteration] != undefined) {
-                                        if (iterPoints[iterHash[s.Iteration].Name] == undefined)
-                                            iterPoints[iterHash[s.Iteration].Name] = {
-                                                Points : 0,
-                                                Start  : iterHash[s.Iteration].Start
-                                            };
-                                        iterPoints[iterHash[s.Iteration].Name].Points += parseInt(s.PlanEstimate);
-                                    }
-                                });
-                                Ext.Array.each(qDates, function(d) {
-                                    if (d.dateStr > Rally.util.DateTime.toIsoString(new Date())) { //Date is in the future
-                                        for (i in iterPoints) {
-                                            if (d.dateStr > iterPoints[i].Start) { //Date is after start of the iteration
-                                                d.Accepted += iterPoints[i].Points;
-                                            }
-                                        }
-                                        d.Planned  = d.Accepted;
-                                        d.Accepted = 0;
-                                        d.Color    = 'rgb(113,205,91)';
-                                    }
-                                });
-                                for (var d = qDates.length - 1; d > 0; d--) {
-                                    if (qDates[d].Planned == qDates[d - 1].Planned) qDates[d].Planned = null;
-                                    else break;
-                                }
-                                drawChart();
-                            }
-            
-                        }
-            
-                        function getPointsOn(date, callback) {
-                            Ext.create('Rally.data.lookback.SnapshotStore', {
-                                autoLoad: true,
-                                pageSize: 10000,
-                                fetch: ['_UnformattedID','Name','PlanEstimate','ScheduleState','Iteration'],
-                                hydrate: ['ScheduleState'],
-                                filters: [{
-                                    property : '__At',
-                                    value    : date
-                                },{
-                                    property : '_TypeHierarchy',
-                                    value    : 'HierarchicalRequirement'
-                                },{
-                                    property : '_ItemHierarchy',
-                                    value    : App.down('#projectTree').getSelectionModel().getSelection()[0].raw.id
-                                },{
-                                    property : 'PlanEstimate',
-                                    operator : '>',
-                                    value    : 0
-                                },{
-                                    property : 'Children',
-                                    value    : null
-                                }],
-                                listeners: {
-                                    load: function(store, data) {
-                                        var totalPoints    = 0,
-                                            acceptedPoints = 0,
-                                            storyData      = [];
-                                        Ext.Array.each(data, function(s) {
-                                            totalPoints += parseInt(s.raw.PlanEstimate);
-                                            if (s.raw.ScheduleState == 'Accepted') acceptedPoints += parseInt(s.raw.PlanEstimate);
-                                            storyData.push(s.raw);
+                iterations: {
+                    dateHash: {},
+                    loaded: false,
+                    getFuture: function() {
+                        var loader = Ext.create('Rally.data.WsapiDataStore', {
+                            model     : 'Iteration',
+                            fetch     : ['ObjectID','StartDate'],
+                            filters   : [{
+                                property : 'StartDate',
+                                operator : '>=',
+                                value    : Rally.util.DateTime.toIsoString(new Date())
+                            },{
+                                property : 'StartDate',
+                                operator : '<=',
+                                value    : Rally.util.DateTime.toIsoString(Ext.Date.add(new Date(), Ext.Date.YEAR, 2)) //Ignore iterations scheduled to arbitrary dates in the future (Max 2 years out)
+                            }],
+                            sorters : [{
+                                property : 'StartDate',
+                                direction : 'DESC'
+                            }],
+                            listeners : {
+                                load : function(store, data) {
+                                    if (data && data.length) {
+                                        var aDate, bDate;
+                                        Ext.Array.each(data, function(i) {
+                                            var aDate = Ext.Date.clearTime(Rally.util.DateTime.fromIsoString(i.raw.StartDate));
+                                            while (aDate.getDay() !== 0) { aDate = Ext.Date.add(aDate, Ext.Date.DAY, -1); }
+                                            App.iterations.dateHash[i.raw.ObjectID] = Rally.util.DateTime.toIsoString(aDate);
                                         });
-                                        callback(totalPoints, acceptedPoints, storyData);
+                                        loader.nextPage();
+                                    } else {
+                                        App.iterations.loaded = true;
                                     }
                                 }
-                            });
-                        }
-            
-                        function drawChart() {
-                            for (var d = qDates.length - 1; d > 0; d--) {
-                                if (qDates[d].dateStr > Rally.util.DateTime.toIsoString(new Date())) qDates[d].Accepted = null;
-                                else break;
                             }
-                            Ext.getBody().unmask();
-                            App.down('#viewport').removeAll();
-                            App.down('#viewport').add({
-                                xtype  : 'container',
-                                layout : 'fit',
-                                height : 20,
-                                html   : '<div class="chart_title">"' + App.down('#projectTree').getSelectionModel().getSelection()[0].raw.name + '" Burn-Up</div>'
-                            });
-                            var popupListener = {
-                                itemmousedown : function(obj) {
-                                    //When the user clicks a bar the current composition for that time should show up
-                                    App.popup = Ext.create('Rally.ui.dialog.Dialog', {
-                                        id         : 'popup',
-                                        width      : Ext.getBody().getWidth(),
-                                        height     : Ext.getBody().getHeight(),
-                                        autoScroll : true,
-                                        closable   : true,
-                                        title      : '"' + App.down('#projectTree').getSelectionModel().getSelection()[0].raw.name + '" User Story Composition (' + obj.storeItem.raw.date + ')',
-                                        autoShow   : true,
-                                        items: [{
-                                            xtype             : 'rallygrid',
-                                            layout            : 'fit',
-                                            showPagingToolbar : false,
-                                            disableSelection  : true,
-                                            store : Ext.create('Rally.data.custom.Store', {
-                                                data     : obj.storeItem.raw.Stories,
-                                                fields   : ['_UnformattedID','Name','PlanEstimate','ScheduleState'],
-                                                sorters  : [{
-                                                    property  : '_UnformattedID',
-                                                    direction : 'ASC'
-                                                }],
-                                                pageSize : 1000
-                                            }),
-                                            columnCfgs : [{
-                                                text      : 'ID',
-                                                dataIndex : '_UnformattedID',
-                                                width     : 60,
-                                                renderer  : function(val) {
-                                                    return 'US' + val;
-                                                }
-                                            },{
-                                                text      : 'Name',
-                                                dataIndex : 'Name',
-                                                flex      : 1
-                                            },{
-                                                text      : 'Plan Estimate',
-                                                dataIndex : 'PlanEstimate',
-                                                width     : 100,
-                                                align     : 'center'
-                                            },{
-                                                text      : 'State',
-                                                dataIndex : 'ScheduleState',
-                                                width     : 100,
-                                                align     : 'center'
-                                            }]
-                                        }],
-                                        listeners: {
-                                            afterrender: function() {
-                                                this.toFront();
-                                                this.focus();
-                                            }
-                                        }
-                                    });
-                                }
-                            };
-                            var series = [{
-                                type: 'column',
-                                axis: 'left',
-                                xField: 'date',
-                                yField: 'Accepted',
-                                renderer: function(sprite, record, attr, index, store) {
-                                    return Ext.apply(attr, {
-                                        fill: record.get('Color')
-                                    });
-                                },
-                                style: {
-                                    fill: '#5C9ACB'
-                                },
-                                tips: {
-                                    trackMouse: true,
-                                    width: 100,
-                                    height: 45,
-                                    renderer: function(storeItem, item) {
-                                        this.setTitle('<b>' + Ext.Date.format(new Date(storeItem.raw.dateStr), 'M j, Y') + '</b><br />' + Ext.util.Format.number(storeItem.get('Accepted'), '0,000') + ' Points');
-                                    }
-                                },
-                                listeners: popupListener
-                            }];
-                            if (App.down('#showFuture').getValue()) series.push({
-                                type: 'column',
-                                axis: 'left',
-                                xField: 'date',
-                                yField: 'Planned',
-                                renderer: function(sprite, record, attr, index, store) {
-                                    return Ext.apply(attr, {
-                                        fill: record.get('Color')
-                                    });
-                                },
-                                style: {
-                                    fill: '#71CD5B'
-                                },
-                                tips: {
-                                    trackMouse: true,
-                                    width: 100,
-                                    height: 45,
-                                    renderer: function(storeItem, item) {
-                                        this.setTitle('<b>' + Ext.Date.format(new Date(storeItem.raw.dateStr), 'M j, Y') + '</b><br />' + Ext.util.Format.number(storeItem.get('Planned'), '0,000') + ' Points');
-                                    }
-                                },
-                                listeners: popupListener
-                            });
-                            series.push({
-                                type: 'line',
-                                axis: 'left',
-                                xField: 'date',
-                                yField: 'Total',
-                                markerConfig: {
-                                    type: 'circle',
-                                    size: 3,
-                                    stroke: '#000',
-                                    fill: '#FFF'
-                                },
-                                style: {
-                                    stroke: '#000',
-                                    'stroke-width': 2,
-                                },
-                                tips: {
-                                    trackMouse: true,
-                                    width: 100,
-                                    height: 45,
-                                    renderer: function(storeItem, item) {
-                                        this.setTitle('<b>' + Ext.Date.format(new Date(storeItem.raw.dateStr), 'M j, Y') + '</b><br />' + Ext.util.Format.number(storeItem.get('Total'), '0,000') + ' Points');
-                                    }
-                                },
-                                listeners: popupListener
-                            });
+                        });
+                        loader.loadPage(1);
+                    }
+                },
             
-                            App.down('#viewport').add({
-                                xtype   : 'chart',
-                                id      : 'chart',
-                                width   : Ext.get('viewport').getWidth()  - 40,
-                                height  : Ext.get('viewport').getHeight() - 40,
-                                margin  : '10 0 0 10',
-                                animate : true,
-                                legend  : { position: 'right' },
-                                store   : Ext.create('Ext.data.JsonStore', {
-                                    fields : ['date','Accepted','Planned','Color','Total'],
-                                    data   : qDates
-                                }),
-                                axes: [{
-                                    type: 'Numeric',
-                                    position: 'left',
-                                    fields: ['Accepted','Planned','Total'],
-                                    title: 'Plan Estimate',
-                                    grid: true
-                                },{
-                                    type     : 'Category',
-                                    position : 'bottom',
-                                    fields   : ['date'],
-                                    title    : 'Date',
-                                    label   : {
-                                        rotate:{degrees:315},
-                                        renderer: function(d){
-                                            return d.substring(5,10);
-                                        }
+                projectStats: {
+                    getBlockedStoryCount: function(callback) {
+                        Ext.create('Rally.data.lookback.SnapshotStore', {
+                            autoLoad : true,
+                            pageSize : 1,
+                            fetch    : ['PlanEstimate','Iteration'],
+                            filters  : [{
+                                property : '__At',
+                                value    : 'current'
+                            },{
+                                property : '_TypeHierarchy',
+                                value    : 'HierarchicalRequirement'
+                            },{
+                                property : '_ItemHierarchy',
+                                operator : 'in',
+                                value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+                            },{
+                                property : 'Children',
+                                value    : null
+                            },{
+                                property : 'Blocked',
+                                value    : true
+                            }],
+                            listeners : {
+                                load : function(store, data, success) {
+                                    callback(store.totalCount);
+                                }
+                            }
+                        });
+                    },
+            
+                    getUnEstimatedCount: function(callback) { //Non Initial Version / Accepted
+                        Ext.create('Rally.data.lookback.SnapshotStore', {
+                            autoLoad : true,
+                            pageSize : 1,
+                            fetch    : ['PlanEstimate','Iteration','ScheduleState'],
+                            hydrate  : ['ScheduleState'],
+                            filters  : [{
+                                property : '__At',
+                                value    : 'current'
+                            },{
+                                property : '_TypeHierarchy',
+                                value    : 'HierarchicalRequirement'
+                            },{
+                                property : '_ItemHierarchy',
+                                operator : 'in',
+                                value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+                            },{
+                                property : 'Children',
+                                value    : null
+                            },{
+                                property : 'PlanEstimate',
+                                value    : 0
+                            },{
+                                property : 'ScheduleState',
+                                operator : '!=',
+                                value    : 'Initial Version'
+                            },{
+                                property : 'ScheduleState',
+                                operator : '!=',
+                                value    : 'Accepted'
+                            }],
+                            listeners : {
+                                load : function(store, data, success) {
+                                    callback(store.totalCount);
+                                }
+                            }
+                        });
+                    }
+                },
+            
+                viewport: {
+                    update: function() {
+                        Ext.getBody().mask('Loading');
+                        var info = App.down('#rpmTree').getSelectionModel().getSelection()[0].raw;
+                        App.projectStats.getBlockedStoryCount(function(blockedCount) {
+                            App.projectStats.getUnEstimatedCount(function(unEstimatedCount) {
+                                App.down('#settings').setHeight(160);
+                                App.down('#rpm_level_info').update({
+                                    html: '<div class="info_title">Planned Start Date:</div>'       + ((info.pStart) ? info.pStart.substring(0,10) : 'N/A') + '<br /> \
+                                           <div class="info_title">Planned End Date:</div>'         + ((info.pEnd)   ? info.pEnd.substring(0,10)   : 'N/A') + '<br /> \
+                                           <div class="info_title">Blocked User Stories:</div>'     + Ext.util.Format.number(blockedCount, '0,0')           + '<br /> \
+                                           <div class="info_title">Unestimated User Stories:</div>' + Ext.util.Format.number(unEstimatedCount, '0,0')       + '<br /> \
+                                           <div class="info_title">Acceptance Rate:</div>'          + Ext.util.Format.number(parseFloat((info.acpCnt / info.usCnt) * 100), '0.0') + '% (' + Ext.util.Format.number(info.acpCnt, '0,0') + ' / ' + Ext.util.Format.number(info.usCnt, '0,0') + ')<br />'
+                                });     
+                            });
+                        });
+                        //Load historical data from selected RPM level
+                        Ext.create('Rally.data.lookback.SnapshotStore', {
+                            autoLoad : true,
+                            pageSize : 1000000,
+                            fetch    : ['AcceptedLeafStoryPlanEstimateTotal','LeafStoryPlanEstimateTotal'],
+                            filters  : [{
+                                property : 'ObjectID',
+                                value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+                            }],
+                            listeners : {
+                                load : function(store, data, success) {
+                                    App.viewport.lbData = [];
+                                    Ext.Array.each(data, function(i) {
+                                        App.viewport.lbData.push(i.raw);
+                                    });
+                                    App.datePickerListen = false;
+                                    App.down('#min_date').setValue(Ext.Date.clearTime((App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.pStart) ? Rally.util.DateTime.fromIsoString(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.pStart) : Ext.Date.add(new Date(), Ext.Date.DAY, -30)));
+                                    App.down('#max_date').setValue(Ext.Date.clearTime((App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.pEnd && App.down('#showFuture').getValue() === true) ? Rally.util.DateTime.fromIsoString(App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.pEnd) : new Date()));
+                                    App.datePickerListen = true;
+                                    App.viewport.populateGrid();
+                                }
+                            }
+                        });
+                    },
+            
+                    populateGrid: function() {
+                        var aDate = App.down('#min_date').getValue();
+                        var bDate = App.down('#max_date').getValue();
+                        //Align dates with begining of week (Sunday)
+                        while (aDate.getDay() !== 0) {
+                            aDate = Ext.Date.add(aDate, Ext.Date.DAY, -1);
+                        }
+                        while (bDate.getDay() !== 0) {
+                            bDate = Ext.Date.add(bDate, Ext.Date.DAY, -1);
+                        }
+            
+                        var remaining          = 0;
+                        var qDates             = [];
+                        App.viewport.chartData = [];
+                        while (aDate <= bDate) {
+                            remaining++;
+                            qDates.push(Rally.util.DateTime.toIsoString(aDate));
+                            aDate = Ext.Date.add(aDate, Ext.Date.DAY, 7);
+                        }
+                        for (d in qDates) {
+                            getScopeOn(qDates[d], function() {
+                                if (!--remaining) {
+                                    if (App.down('#showFuture').getValue() === true) {
+                                        var onFutureIterOIDs = setInterval(function() {
+                                            if (App.iterations.loaded) {
+                                                clearInterval(onFutureIterOIDs);
+                                                App.viewport.getPlannedScope();
+                                            }
+                                        }, 250);
+                                    } else {
+                                        App.viewport.drawChart();
                                     }
-                                }],
-                                series: series
+                                }
                             });
                         }
-                	}
+            
+                        function getScopeOn(date, callback) {
+                            if (App.viewport.lbData.length > 0 && App.viewport.lbData[0]._ValidFrom <= date) {
+                                Ext.Array.each(App.viewport.lbData, function(n) {
+                                    if (n._ValidFrom <= date && n._ValidTo >= date) {
+                                        App.viewport.chartData.push({
+                                            Date     : date,
+                                            Total    : n.LeafStoryPlanEstimateTotal,
+                                            Accepted : n.AcceptedLeafStoryPlanEstimateTotal,
+                                            Planned  : 0,
+                                            Color    : '#5C9ACB'
+                                        });
+                                        callback(0);
+                                    } 
+                                });
+                            } else {
+                                callback(-1);
+                            }
+                        }
+                    },
+            
+                    getPlannedScope: function() {
+                        App.viewport.plannedOffChart = false;
+                        Ext.create('Rally.data.lookback.SnapshotStore', {
+                            autoLoad : true,
+                            pageSize : 1000000,
+                            fetch    : ['PlanEstimate','Iteration'],
+                            filters  : [{
+                                property : '__At',
+                                value    : 'current'
+                            },{
+                                property : '_TypeHierarchy',
+                                value    : 'HierarchicalRequirement'
+                            },{
+                                property : '_ItemHierarchy',
+                                operator : 'in',
+                                value    : App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.id
+                            },{
+                                property : 'Iteration',
+                                operator : '!=',
+                                value    : null
+                            },{
+                                property : 'PlanEstimate',
+                                operator : '>',
+                                value    : 0
+                            },{
+                                property : 'Children',
+                                value    : null
+                            }],
+                            listeners : {
+                                load : function(store, data, success) {
+                                    Ext.Array.each(data, function(i) {
+                                        if (App.iterations.dateHash[i.raw.Iteration] !== undefined) {
+                                            Ext.Array.each(App.viewport.chartData, function(j) {
+                                                if (App.viewport.plannedOffChart === false && App.iterations.dateHash[i.raw.Iteration] > Rally.util.DateTime.toIsoString(App.down('#max_date').getValue())) {
+                                                    App.viewport.plannedOffChart = true;
+                                                }
+                                                if (j.Date >= App.iterations.dateHash[i.raw.Iteration]) {
+                                                    j.Planned += i.raw.PlanEstimate;
+                                                }
+                                            });
+                                        }
+                                    });
+                                    App.viewport.drawChart();
+                                }
+                            }
+                        });
+                    },
+            
+                    drawChart: function() {
+                        App.viewport.chartData.sort(function(a, b) {
+                            return a['Date'] > b['Date'] ? 1 : a['Date'] < b['Date'] ? -1 : 0;
+                        });
+                        var now = Rally.util.DateTime.toIsoString(new Date());
+                        Ext.Array.each(App.viewport.chartData, function(i) {
+                            if (i.Date > now) {
+                                i.Planned += i.Accepted;
+                                i.Accepted = 0;
+                                i.Color = '#71CD5B';
+                            }
+                        });
+                        if (App.viewport.plannedOffChart == false) {
+                            for (var i = App.viewport.chartData.length - 1; i > 2; i--) {
+                                if (App.viewport.chartData[i].Planned === App.viewport.chartData[i - 3].Planned) //Assuming 3 week iterations
+                                    App.viewport.chartData[i].Planned = 0;
+                                else
+                                    break;
+                            };
+                        }
+                        var series = [{
+                            type: 'column',
+                            axis: 'left',
+                            xField: 'Date',
+                            yField: 'Accepted',
+                            renderer: function(sprite, record, attr, index, store) {
+                                return Ext.apply(attr, {
+                                    fill: record.get('Color')
+                                });
+                            },
+                            style: {
+                                fill: '#5C9ACB'
+                            },
+                            tips: {
+                                trackMouse: true,
+                                width: 100,
+                                height: 45,
+                                renderer: function(storeItem, item) {
+                                    this.setTitle('<b>' + Ext.Date.format(Rally.util.DateTime.fromIsoString(storeItem.raw.Date), 'M j, Y') + '</b><br />' + Ext.util.Format.number(storeItem.get('Accepted'), '0,000') + ' Points');
+                                }
+                            }
+                        }];
+                        if (App.down('#showFuture').getValue() === true) series.push({
+                            type: 'column',
+                            axis: 'left',
+                            xField: 'Date',
+                            yField: 'Planned',
+                            renderer: function(sprite, record, attr, index, store) {
+                                return Ext.apply(attr, {
+                                    fill: record.get('Color')
+                                });
+                            },
+                            style: {
+                                fill: '#71CD5B'
+                            },
+                            tips: {
+                                trackMouse: true,
+                                width: 100,
+                                height: 45,
+                                renderer: function(storeItem, item) {
+                                    this.setTitle('<b>' + Ext.Date.format(Rally.util.DateTime.fromIsoString(storeItem.raw.Date), 'M j, Y') + '</b><br />' + Ext.util.Format.number(storeItem.get('Planned'), '0,000') + ' Points');
+                                }
+                            }
+                        });
+                        series.push({
+                            type: 'line',
+                            axis: 'left',
+                            xField: 'Date',
+                            yField: 'Total',
+                            markerConfig: {
+                                type: 'circle',
+                                size: 3,
+                                stroke: '#000',
+                                fill: '#FFF'
+                            },
+                            style: {
+                                stroke: '#000',
+                                'stroke-width': 2,
+                            },
+                            tips: {
+                                trackMouse: true,
+                                width: 100,
+                                height: 45,
+                                renderer: function(storeItem, item) {
+                                    this.setTitle('<b>' + Ext.Date.format(Rally.util.DateTime.fromIsoString(storeItem.raw.Date), 'M j, Y') + '</b><br />' + Ext.util.Format.number(storeItem.get('Total'), '0,000') + ' Points');
+                                }
+                            }
+                        });
+            
+                        Ext.getBody().unmask();
+                        App.down('#viewport').removeAll();
+                        App.down('#viewport').add({
+                            xtype  : 'container',
+                            layout : 'fit',
+                            height : 20,
+                            html   : '<div class="chart_title">"' + App.down('#rpmTree').getSelectionModel().getSelection()[0].raw.name + '" Burn-Up</div>'
+                        });
+                        App.down('#viewport').add({
+                            xtype   : 'chart',
+                            id      : 'chart',
+                            width   : Ext.get('viewport').getWidth()  - 25,
+                            height  : Ext.get('viewport').getHeight() - 40,
+                            margin  : '10 0 0 10',
+                            animate : true,
+                            legend  : { position: 'right' },
+                            store   : Ext.create('Ext.data.JsonStore', {
+                                fields : ['Date','Accepted','Planned','Color','Total'],
+                                data   : App.viewport.chartData
+                            }),
+                            axes: [{
+                                type: 'Numeric',
+                                position: 'left',
+                                fields: ['Accepted','Planned','Total'],
+                                title: 'Plan Estimate',
+                                grid: true
+                            },{
+                                type     : 'Category',
+                                position : 'bottom',
+                                fields   : ['Date'],
+                                title    : 'Date',
+                                label   : {
+                                    rotate:{degrees:315},
+                                    renderer: function(d){
+                                        return d.substring(0,10);
+                                    }
+                                }
+                            }],
+                            series: series
+                        });
+            
+                    }  
                 }
             });
-						Rally.launchApp('CustomApp', {
-								name: 'RPM_BU'
-						});
+            Rally.launchApp('CustomApp', {
+                name: 'RPM_BU'
+            });
         });
-		</script>
+    </script>
 
-		<style type="text/css">
-        .count {
+    <style type="text/css">
+        #rpmTree .x-grid-cell-inner .count {
         	width         : 25px;
         	border        : 1px solid #B7841F;
         	display       : inline-block;
@@ -622,11 +648,70 @@
         	filter        : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffff99', endColorstr='#ffd46f',GradientType=0 );
         }
         
+        .x-tree-icon { display    : none    !important; }
+        
+        .btn > .x-grid-cell-inner:hover {
+        	cursor: pointer !important;
+        }
+        
+        .green  > .x-grid-cell-inner,
+        .red    > .x-grid-cell-inner,
+        .yellow > .x-grid-cell-inner,
+        .grey   > .x-grid-cell-inner {
+        	border-radius : 3px    !important;
+        	margin        : 3px    !important;
+        	text-align    : center !important; 
+        }
+        .green > .x-grid-cell-inner {
+        	border     : 1px solid #afd3b6;
+        	background : #c6efce;
+        	background : -moz-linear-gradient(top,  #c6efce 0%, #afd3b6 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#c6efce), color-stop(100%,#afd3b6));
+        	background : -webkit-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -o-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : -ms-linear-gradient(top,  #c6efce 0%,#afd3b6 100%);
+        	background : linear-gradient(to bottom,  #c6efce 0%,#afd3b6 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#c6efce', endColorstr='#afd3b6',GradientType=0 );
+        }
+        
+        .red > .x-grid-cell-inner {
+        	border     : 1px solid #e5b5ba;
+        	background : #ffc7ce;
+        	background : -moz-linear-gradient(top,  #ffc7ce 0%, #e5b5ba 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffc7ce), color-stop(100%,#e5b5ba));
+        	background : -webkit-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -o-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : -ms-linear-gradient(top,  #ffc7ce 0%,#e5b5ba 100%);
+        	background : linear-gradient(to bottom,  #ffc7ce 0%,#e5b5ba 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffc7ce', endColorstr='#e5b5ba',GradientType=0 );
+        }
+        .yellow > .x-grid-cell-inner {
+        	border     : 1px solid #e5d28e;
+        	background : #ffeb9c;
+        	background : -moz-linear-gradient(top,  #ffeb9c 0%, #e5d28e 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffeb9c), color-stop(100%,#e5d28e));
+        	background : -webkit-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -o-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : -ms-linear-gradient(top,  #ffeb9c 0%,#e5d28e 100%);
+        	background : linear-gradient(to bottom,  #ffeb9c 0%,#e5d28e 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffeb9c', endColorstr='#e5d28e',GradientType=0 );
+        }
+        .grey > .x-grid-cell-inner {
+        	border     : 1px solid #cfd1d3;
+        	background : #e7ebee;
+        	background : -moz-linear-gradient(top,  #e7ebee 0%, #cfd1d3 100%);
+        	background : -webkit-gradient(linear, left top, left bottom, color-stop(0%,#e7ebee), color-stop(100%,#cfd1d3));
+        	background : -webkit-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -o-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : -ms-linear-gradient(top,  #e7ebee 0%,#cfd1d3 100%);
+        	background : linear-gradient(to bottom,  #e7ebee 0%,#cfd1d3 100%);
+        	filter     : progid:DXImageTransform.Microsoft.gradient( startColorstr='#e7ebee', endColorstr='#cfd1d3',GradientType=0 );
+        }
         .info_title {
         	display: inline-block;
         	width: 150px;
         	text-align: right;
-        	margin-right: 6px;
+        	margin: 3px 6px 0 0;
         }
         
         .chart_title {
@@ -634,10 +719,6 @@
         	font-size: 14px;
         	font-weight: bold;
         	margin: 10px 50px 0 0;
-        }
-        
-        .error {
-        	text-align: center;
         }    </style>
 </head>
 <body></body>
