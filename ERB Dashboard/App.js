@@ -1,4 +1,4 @@
-// ERB Dashboard - Version 2.3.2
+// ERB Dashboard - Version 2.5
 // Copyright (c) 2013 Cambia Health Solutions. All rights reserved.
 // Developed by Conner Reeves - Conner.Reeves@cambiahealth.com
 Ext.define('CustomApp', {
@@ -15,9 +15,10 @@ Ext.define('CustomApp', {
     }],
 
 	launch: function() {
-        App     = this;
-        App.ENV = 'rally1';
-        App.Toolbar.init();
+        App = this;
+        App.teamNameHash.init(function() {
+            App.toolbar.init();
+        });
         App.down('#viewport').addListener('resize', function() {
             if (App.popup) {
                 App.popup.setWidth(Ext.getBody().getWidth());
@@ -26,42 +27,63 @@ Ext.define('CustomApp', {
         });
 	},
 
-    Toolbar: {
-        init: function() {
-            App.down('#toolbar').add({
-                xtype      : 'spinnerfield',
-                fieldLabel : 'Release Week:',
-                id         : 'releaseYear',
-                value      : new Date().getFullYear(),
-                width      : 135,
-                labelWidth : 72,
-                editable   : false,
-                onSpinUp: function() {
-                    this.setValue(parseInt(this.getValue()) + 1);
-                    App.Toolbar.WeekPicker.update();
-                },
-                onSpinDown: function() {
-                    var val = parseInt(this.getValue()) - 1;
-                    if (val >= 2013) {
-                        this.setValue(val);
-                        App.Toolbar.WeekPicker.update();
-                    }
-                },
-                listeners: {
-                    added: function() {
-                        App.Toolbar.WeekPicker.add();
-                    }
+    teamNameHash: {
+        init: function(callback) {
+            Ext.create('Rally.data.WsapiDataStore', {
+                model : 'Project',
+                limit : Infinity,
+                fetch : ['ObjectID','Name']
+            }).load({
+                callback: function(store) {
+                    App.teamNameHash = {};
+                    Ext.Array.each(store.getItems(), function(team) {
+                        App.teamNameHash[team.ObjectID] = team.Name;
+                    });
+                    callback();
                 }
             });
-        },
+        }
+    },
 
-        WeekPicker: {
+    toolbar: {
+        init: function() {
+            App.toolbar.yearPicker.add(function() {
+                App.toolbar.weekPicker.add();
+            });
+        },
+        yearPicker: {
+            add: function(callback) {
+                App.down('#toolbar').add({
+                    xtype      : 'spinnerfield',
+                    fieldLabel : 'Release Week:',
+                    id         : 'releaseYear',
+                    value      : new Date().getFullYear(),
+                    width      : 135,
+                    labelWidth : 72,
+                    editable   : false,
+                    onSpinUp: function() {
+                        this.setValue(parseInt(this.getValue()) + 1);
+                        App.toolbar.weekPicker.update();
+                    },
+                    onSpinDown: function() {
+                        if (this.getValue() > 2013) {
+                            this.setValue(parseInt(this.getValue()) - 1);
+                            App.toolbar.weekPicker.update();
+                        }
+                    },
+                    listeners: {
+                        added: callback
+                    }
+                });
+            }
+        },
+        weekPicker: {
             add: function() {
-                App.Toolbar.WeekPicker.getWeekInfo(function(weekStore, currWeek) {
+                App.toolbar.weekPicker.getWeekInfo(function(weekStore, currWeek) {
                     App.down('#toolbar').add({
                         xtype          : 'combo',
                         id             : 'releaseWeek',
-                        width          : 175,
+                        width          : 155,
                         editable       : false,
                         forceSelection : true,
                         queryMode      : 'local',
@@ -73,8 +95,36 @@ Ext.define('CustomApp', {
                             data: weekStore
                         },
                         listeners   : {
-                            change  : App.Viewport.update,
-                            added   : App.Viewport.update
+                            change  : App.viewport.update,
+                            added   : function() {
+                                App.down('#toolbar').add({
+                                    xtype   : 'button',
+                                    cls     : 'weekChangeBtn',
+                                    text    : '&#8249;',
+                                    height  : 18,
+                                    border  : 0,
+                                    margins : '2 0 0 8',
+                                    handler : function() {
+                                        var picker = App.down('#releaseWeek');
+                                        var index  = picker.findRecord(picker.valueField || picker.displayField, picker.getValue()).index;
+                                        if (index > 0) picker.select(picker.getStore().getAt(index - 1).data.DateRange);
+                                    }
+                                });
+                                App.down('#toolbar').add({
+                                    xtype   : 'button',
+                                    cls     : 'weekChangeBtn',
+                                    text    : '&#8250;',
+                                    height  : 18,
+                                    border  : 0,
+                                    margins : '2 0 0 5',
+                                    handler : function() {
+                                        var picker = App.down('#releaseWeek');
+                                        var index  = picker.findRecord(picker.valueField || picker.displayField, picker.getValue()).index;
+                                        if (index < picker.getStore().data.length - 1) picker.select(picker.getStore().getAt(index + 1).data.DateRange);
+                                    }
+                                });
+                                App.viewport.update();
+                            }
                         }
                     });
                 });
@@ -82,7 +132,7 @@ Ext.define('CustomApp', {
 
             update: function() {
                 App.down('#releaseWeek').destroy();
-                App.Toolbar.WeekPicker.add();
+                App.toolbar.weekPicker.add();
             },
 
             getWeekInfo: function(callback) {
@@ -108,268 +158,264 @@ Ext.define('CustomApp', {
                 } while (weekNumber <= 52);
                 if (currWeek == null) currWeek = weeks[0].DateRange;
                 callback(weeks, currWeek);
-            }  
+            }
         }
     },
 
-    Viewport: {
+    viewport: {
         update: function() {
             Ext.getBody().mask('Loading...');
-            var gridData  = {};
-            var gridArray = [];
-            getData('UserStory', function() {
-                getData('Defect', function() {
-                    //Process data into grid array
-                    var existFilter = [];
-                    for (g in gridData) {
-                        existFilter.push({
-                            property : 'Name',
-                            operator : '!=',
-                            value    : g
+            getBundlesInSelectedTimeFrame(function() {
+                if (Ext.Object.getKeys(App.bundlesObj).length === 0) {
+                    App.down('#viewport').removeAll();
+                    Ext.getBody().unmask();
+                    Ext.Msg.alert('Error', 'No bundles found for the selected week.');
+                    return;
+                }
+                var completedWorkItemQueries = 0;
+                var filter = Ext.Array.map(Ext.Object.getKeys(App.bundlesObj), function(bundle) {
+                    return {
+                        property : 'Release.Name',
+                        value    : bundle
+                    };
+                });
+                Ext.Array.each(['userstory','defect'], function(model) {
+                    getWorkItems(model, filter, function() {
+                        if (++completedWorkItemQueries === 2) aggregateRates(function() {
+                            drawGrid();
                         });
-                    }
-
-                    var releaseLoader = Ext.create('Rally.data.WsapiDataStore', {
-                        model    : 'Release',
-                        fetch    : ['Name'],
-                        filters: [
-                            { property: 'Name',        operator: 'contains', value: 'BNDL'                                        },
-                            { property: 'ReleaseDate', operator: '>=',       value: App.down('#releaseWeek').getValue().StartDate },
-                            { property: 'ReleaseDate', operator: '<=',       value: App.down('#releaseWeek').getValue().EndDate   }
-                        ].concat(existFilter),
-                        listeners : {
-                            load : function(store, data) {
-                                if (data && data.length) {
-                                    Ext.Array.each(data, function(r) {
-                                        if (gridData[r.raw._refObjectName] == undefined) {
-                                            gridData[r.raw._refObjectName] = {
-                                                UserStories : [],
-                                                Defects     : [],
-                                                TestCases   : [],
-                                                Notes       : []
-                                            }
-                                        }
-                                    });
-                                    releaseLoader.nextPage();
-                                } else {
-                                    var bNode;
-                                    for (b in gridData) {
-                                        bNode = {
-                                            Project       : (b.match(/( - )(.+)(:)/)) ? b.match(/( - )(.+)(:)/)[2] : '',
-                                            Bundle        : b,
-                                            US_Acpt_Count : 0,
-                                            DE_Crit_Count : 0,
-                                            DE_High_Count : 0,
-                                            DE_Clos_Count : 0,
-                                            TC_Pass_Count : 0,
-                                            Notes         : '',
-                                            US_Store      : gridData[b].UserStories,
-                                            DE_Store      : gridData[b].Defects,
-                                            TC_Store      : gridData[b].TestCases
-                                        };
-                                        for (us in gridData[b].UserStories) {
-                                            if (gridData[b].UserStories[us].ScheduleState == 'Accepted') bNode.US_Acpt_Count++;
-                                        }
-                                        for (d in gridData[b].Defects) {
-                                            if (gridData[b].Defects[d].State == 'Closed') {
-                                                bNode.DE_Clos_Count++;
-                                            } else if (gridData[b].Defects[d].Severity == 'Critical') {
-                                                bNode.DE_Crit_Count++;
-                                            } else if (gridData[b].Defects[d].Severity == 'High') {
-                                                bNode.DE_High_Count++;
-                                            } else {
-                                                bNode.DE_Clos_Count++; // Medium or cosmetic, not included in WI rate
-                                            }
-                                        }
-                                        for (tc in gridData[b].TestCases) {
-                                            if (gridData[b].TestCases[tc].LastVerdict == 'Pass') bNode.TC_Pass_Count++;
-                                        }
-                                        for (n in gridData[b].Notes) {
-                                            bNode.Notes += '<div class="note">' + gridData[b].Notes[n] + '</div>';
-                                        }
-                                        bNode.WI_Acpt_Rate = ((bNode.US_Store.length + bNode.DE_Store.length) == 0) ? 'N/A' : parseFloat((bNode.US_Acpt_Count + bNode.DE_Clos_Count) / (bNode.US_Store.length + bNode.DE_Store.length));
-                                        bNode.TC_Pass_Rate = (bNode.TC_Store.length == 0) ? 'N/A' : parseFloat(bNode.TC_Pass_Count / bNode.TC_Store.length);
-                                        gridArray.push(bNode);
-                                    }
-                                    drawGrid();
-                                }
-                            }
-                        }
                     });
-                    releaseLoader.loadPage(1);
                 });
             });
 
-            function getData(data_type, callback) {
-                var loader = Ext.create('Rally.data.WsapiDataStore', {
-                    model: data_type,
-                    fetch: [
-                        'Defects',      'FormattedID', 'FoundInBuild', 'Iteration', 'LastRun', 'LastVerdict',   'Name',  'Notes',        'ObjectID',    'Owner',
-                        'PlanEstimate', 'Project',     'Release',      'Severity',  'ScheduleState', 'State', 'TechnicalSME', 'BusinessSME', 'TestCases'
-                    ],
-                    filters: [
-                        { property: 'Release.Name',        operator: 'contains', value: 'BNDL'                                        },
-                        { property: 'Release.ReleaseDate', operator: '>=',       value: App.down('#releaseWeek').getValue().StartDate },
-                        { property: 'Release.ReleaseDate', operator: '<=',       value: App.down('#releaseWeek').getValue().EndDate   }
-                    ],
-                    listeners: {
-                        load: function(store, data) {
-                            if (data && data.length) {
-                                Ext.Array.each(data, function(x) {
-                                    // Create bundle node if new
-                                    if (gridData[x.raw.Release._refObjectName] == undefined) {
-                                        gridData[x.raw.Release._refObjectName] = {
-                                            UserStories : [],
-                                            Defects     : [],
-                                            TestCases   : [],
-                                            Notes       : []
-                                        }
-                                    }
-                                    // Add data to store
-                                    x.raw.ProjectName = (x.raw.Project) ? x.raw.Project._refObjectName : '';
-                                    x.raw.OwnerName   = (x.raw.Owner)   ? x.raw.Owner._refObjectName   : '';
-                                    if (data_type === 'UserStory') {
-                                        x.raw.State = x.raw.ScheduleState;
-                                        gridData[x.raw.Release._refObjectName].UserStories.push(x.raw);
-                                    } else if (data_type === 'Defect') {
-                                        x.raw.ParentText = '';
-                                        gridData[x.raw.Release._refObjectName].Defects.push(x.raw);
-                                    }
-                                    Ext.Array.each(x.raw.Defects, function(d) {
-                                        if (d.Severity != 'Low' && d.Severity != 'Medium') {
-                                            d.ProjectName = (d.Project) ? d.Project._refObjectName : '';
-                                            d.OwnerName   = (d.Owner)   ? d.Owner._refObjectName   : '';
-                                            d.ParentText  = '<b>' + x.raw.FormattedID + ': </b>' + x.raw._refObjectName;
-                                            gridData[x.raw.Release._refObjectName].Defects.push(d);
-                                        }
-                                    });
-                                    Ext.Array.each(x.raw.TestCases, function(t) {
-                                        t.ProjectName = (t.Project) ? t.Project._refObjectName : '';
-                                        t.OwnerName   = (t.Owner)   ? t.Owner._refObjectName   : '';
-                                        t.ParentText  = '<b>' + x.raw.FormattedID + ': </b>' + x.raw._refObjectName;
-                                        gridData[x.raw.Release._refObjectName].TestCases.push(t);
-                                    });
-                                    if (x.raw.Release.Notes && Ext.Array.indexOf(gridData[x.raw.Release._refObjectName].Notes, '<b>' + x.raw.Project._refObjectName + '</b>: ' + Rally.util.String.stripHTML(x.raw.Release.Notes)) == -1)
-                                        gridData[x.raw.Release._refObjectName].Notes.push('<b>' + x.raw.Project._refObjectName + '</b>: ' + Rally.util.String.stripHTML(x.raw.Release.Notes));
-                                });
-                                loader.nextPage();
-                            } else {
-                                callback();
-                            }
-                        }
+            function getBundlesInSelectedTimeFrame(callback) {
+                Ext.create('Rally.data.WsapiDataStore', {
+                    model   : 'Release',
+                    limit   : Infinity,
+                    fetch   : ['Name','Notes','Project','ObjectID'],
+                    filters : [{
+                        property : 'ReleaseDate',
+                        operator : '>=',
+                        value    : App.down('#releaseWeek').getValue().StartDate
+                    },{
+                        property : 'ReleaseDate',
+                        operator : '<=',
+                        value    : App.down('#releaseWeek').getValue().EndDate
+                    },{
+                        property : 'Name',
+                        operator : 'contains',
+                        value    : 'BNDL'
+                    }]
+                }).load({
+                    callback: function(store) {
+                        App.bundlesObj = {};
+                        Ext.Array.each(store.getItems(), function(bundle) {
+                            if (App.bundlesObj[bundle.Name] === undefined)
+                                App.bundlesObj[bundle.Name] = {
+                                    name                : bundle.Name,
+                                    project             : (bundle.Name.match(/( - )(.+)(:)/)) ? bundle.Name.match(/( - )(.+)(:)/)[2] : '',
+                                    notes               : '',
+                                    defectRecords       : [],
+                                    userstoryRecords    : [],
+                                    testcaseRecords     : []
+                                };
+                            if (bundle.Notes) App.bundlesObj[bundle.Name].notes += '<div><b>' + App.teamNameHash[bundle.Project.ObjectID] + ':</b> ' + Rally.util.String.stripHTML(bundle.Notes) + '</div>';
+                        });
+                        callback();
                     }
                 });
-                loader.loadPage(1);
+            }
+
+            function getWorkItems(model, filter, callback) {
+                Ext.create('Rally.data.WsapiDataStore', {
+                    model   : model,
+                    limit   : Infinity,
+                    fetch: [ 'Defects', 'FormattedID', 'FoundInBuild', 'Iteration', 'LastRun', 'LastVerdict', 'Name', 'Notes', 'ObjectID', 'Owner', 'PlanEstimate', 'Project', 'Release', 'Severity', 'ScheduleState', 'State', 'TechnicalSME', 'BusinessSME', 'TestCases'],
+                    filters : Rally.data.QueryFilter.or(filter)
+                }).load({
+                    callback: function(store) {
+                        Ext.Array.each(store.getItems(), function(item) {
+                            //Set up names at root level for grid indexing
+                            item.ProjectName = item.Project ? item.Project._refObjectName : '';
+                            item.OwnerName   = item.Owner ? item.Owner._refObjectName     : '';
+                            if (model === 'userstory') item.State = item.ScheduleState;
+                            //Add record to bundle record
+                            App.bundlesObj[item.Release.Name][model + 'Records'].push(item);
+                            //Add child Defects and Test Cases to bundle record
+                            var workProductText = '<b>' + item.FormattedID + ':</b> ' + item.Name;
+                            Ext.Array.each(item.Defects, function(defect) {
+                                defect.Release     = item.Release   ? item.Release._refObjectName   : '';
+                                defect.ProjectName = defect.Project ? defect.Project._refObjectName : '';
+                                defect.OwnerName   = defect.Owner   ? defect.Owner._refObjectName   : '';
+                                defect.WorkProduct = workProductText;
+                                App.bundlesObj[item.Release.Name]['defectRecords'].push(defect);
+                            });
+                            Ext.Array.each(item.TestCases, function(testCase) {
+                                testCase.ProjectName = testCase.Project ? testCase.Project._refObjectName : '';
+                                testCase.OwnerName   = testCase.Owner   ? testCase.Owner._refObjectName   : '';
+                                testCase.WorkProduct = workProductText;
+                                App.bundlesObj[item.Release.Name]['testcaseRecords'].push(testCase);
+                            });
+                        });
+                        callback();
+                    }
+                });
+            }
+
+            function aggregateRates(callback) {
+                Ext.Object.each(App.bundlesObj, function(bundleIdx) {
+                    var bundle = App.bundlesObj[bundleIdx];
+                    bundle.highDefectCount        = 0;
+                    bundle.criticalDefectCount    = 0;
+                    bundle.completedWorkItemCount = 0;
+                    bundle.passedTestCaseCount    = 0;
+                    Ext.Array.each(bundle.userstoryRecords, function(us) {
+                        if (us.ScheduleState === 'Accepted' || us.ScheduleState === 'Completed') bundle.completedWorkItemCount++;
+                    });
+                    Ext.Array.each(bundle.defectRecords, function(de) {
+                        if (de.State == 'Closed') {
+                            bundle.completedWorkItemCount++;
+                        } else {
+                            if (de.Severity === 'High') bundle.highDefectCount++;
+                            if (de.Severity === 'Critical') bundle.criticalDefectCount++;
+                        }
+                    });
+                    Ext.Array.each(bundle.testcaseRecords, function(tc) {
+                        if (tc.LastVerdict === 'Pass') bundle.passedTestCaseCount++;
+                    });
+                    bundle.completedWorkItemRate = parseFloat(bundle.completedWorkItemCount / (bundle.userstoryRecords.length + bundle.defectRecords.length)) || -1;
+                    bundle.passedTestCaseRate    = parseFloat(bundle.passedTestCaseCount / bundle.testcaseRecords.length) || -1;
+                });
+                callback();
             }
 
             function drawGrid() {
                 Ext.getBody().unmask();
                 App.down('#viewport').removeAll();
                 App.down('#viewport').add({
-                    xtype: 'rallygrid',
-                    disableSelection: true,
-                    showPagingToolbar: false,
-                    store: Ext.create('Rally.data.custom.Store', {
-                        data     : gridArray,
-                        pageSize : 1000
+                    xtype             : 'rallygrid',
+                    disableSelection  : true,
+                    store             : Ext.create('Rally.data.custom.Store', {
+                        data     : Ext.Object.getValues(App.bundlesObj),
+                        pageSize : 200,
+                        sorters  : [{
+                            property  : 'project',
+                            direction : 'ASC'
+                        },{
+                            property  : 'name',
+                            direction : 'ASC'
+                        }]
                     }),
                     columnCfgs: [{
                         text      : 'Project',
-                        dataIndex : 'Project',
-                        width     : 75
+                        dataIndex : 'project',
+                        width     : 75,
+                        align     : 'right'
                     },{
                         text      : 'Bundle',
-                        dataIndex : 'Bundle',
+                        dataIndex : 'name',
                         flex      : 1
                     },{
                         text      : 'Work Item Status',
-                        dataIndex : 'WI_Acpt_Rate',
+                        dataIndex : 'completedWorkItemRate',
                         width     : 75,
                         align     : 'center',
                         resizable : false,
-                        renderer  : function(val) {
-                            if (val == 'N/A') {
-                                return val;
+                        renderer  : function(val, meta) {
+                            if (val === -1) {
+                                meta.tdCls = 'grey';
+                                return 'N/A';
                             } else {
-                                var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
-                                return '<div class="' + color + ' label">' + parseInt(val * 100) + '%<div>';
+                                val === 1 ? meta.tdCls = 'green' : Ext.Date.add(Rally.util.DateTime.fromIsoString(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date() ? meta.tdCls = 'red' : meta.tdCls = 'yellow';
+                                return (Math.round(val * 1000) / 10) + '%';
                             }   
                         }
                     },{
                         text      : 'Critical Defects',
-                        dataIndex : 'DE_Crit_Count',
+                        dataIndex : 'criticalDefectCount',
                         width     : 75,
                         align     : 'center',
                         resizable : false,
-                        renderer  : function(val) {
-                            return (val == 0) ? '' : '<div class="red label">' + val + '</div>';
-                        }
-                    },{
-                        text      : 'High Defects',
-                        dataIndex : 'DE_High_Count',
-                        width     : 75,
-                        align     : 'center',
-                        resizable : false,
-                        renderer  : function(val) {
-                            return (val == 0) ? '' : '<div class="red label">' + val + '</div>';
-                        }
-                    },{
-                        text      : 'Test Case Status',
-                        dataIndex : 'TC_Pass_Rate',
-                        width     : 75,
-                        align     : 'center',
-                        resizable : false,
-                        renderer  : function(val) {
-                            if (val == 'N/A') {
-                                return val;
+                        renderer  : function(val, meta) {
+                            if (val === 0) {
+                                return '';
                             } else {
-                                var color = (val == 1) ? 'green' : (Ext.Date.add(new Date(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date()) ? 'red' : '';
-                                return '<div class="' + color + ' label">' + parseInt(val * 100) + '%<div>'; 
+                                meta.tdCls = 'red';
+                                return val;
                             }
                         }
                     },{
+                        text      : 'High Defects',
+                        dataIndex : 'highDefectCount',
+                        width     : 75,
+                        align     : 'center',
+                        resizable : false,
+                        renderer  : function(val, meta) {
+                            if (val === 0) {
+                                return '';
+                            } else {
+                                meta.tdCls = 'red';
+                                return val;
+                            }
+                        }
+                    },{
+                        text      : 'Test Case Status',
+                        dataIndex : 'passedTestCaseRate',
+                        width     : 75,
+                        align     : 'center',
+                        resizable : false,
+                        renderer  : function(val, meta) {
+                            if (val === -1) {
+                                meta.tdCls = 'grey';
+                                return 'N/A';
+                            } else {
+                                val === 1 ? meta.tdCls = 'green' : Ext.Date.add(Rally.util.DateTime.fromIsoString(App.down('#releaseWeek').getValue().EndDate), Ext.Date.DAY, -3) < new Date() ? meta.tdCls = 'red' : meta.tdCls = 'yellow';
+                                return (Math.round(val * 1000) / 10) + '%';
+                            }   
+                        }
+                    },{
                         text      : 'Notes',
-                        dataIndex : 'Notes',
+                        dataIndex : 'notes',
                         flex      : 1
                     }],
                     listeners: {
                         itemclick: function(view, record, item, index, evt) {
                             var column = view.getPositionByEvent(evt).column;
                             if (column == 2) {
-                                showPopup('User Stories',record.get('US_Store').concat(record.get('DE_Store')),[
-                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://' + App.ENV + '.rallydev.com/#/detail/' + ((val.match(/US/)) ? 'userstory' : 'defect') + '/' + record.get('ObjectID') + '">' + val + '</a>'; }},
-                                    { text: 'Name',          dataIndex: 'Name',          flex: 1    },
-                                    { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
-                                    { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
-                                    { text: 'Severity',      dataIndex: 'Severity',      width: 100 },
-                                    { text: 'State',         dataIndex: 'State',         width: 75  },
-                                    { text: 'Technical SME', dataIndex: 'TechnicalSME',  width: 100 },
-                                    { text: 'Business SME',  dataIndex: 'BusinessSME',   width: 100 }
+                                showPopup('User Stories',record.get('userstoryRecords').concat(record.get('defectRecords')),[
+                                    { text: 'ID',            dataIndex: 'FormattedID',  width: 60,  align: 'right', renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/' + ((val.match(/US/)) ? 'userstory' : 'defect') + '/' + record.get('ObjectID') + '">' + val + '</a>'; }},
+                                    { text: 'Name',          dataIndex: 'Name',         flex: 1                     },
+                                    { text: 'Project',       dataIndex: 'ProjectName',  width: 175, align: 'center' },
+                                    { text: 'Owner',         dataIndex: 'OwnerName',    width: 100, align: 'center' },
+                                    { text: 'Severity',      dataIndex: 'Severity',     width: 100, align: 'center' },
+                                    { text: 'State',         dataIndex: 'State',        width: 75,  align: 'center' },
+                                    { text: 'Technical SME', dataIndex: 'TechnicalSME', width: 100, align: 'center' },
+                                    { text: 'Business SME',  dataIndex: 'BusinessSME',  width: 100, align: 'center' }
                                 ]);
                             } else if (column == 3 || column == 4) { //Defects
-                                if ((column == 3 && record.get('DE_Crit_Count') == 0) ||
-                                    (column == 4 && record.get('DE_High_Count') == 0)) return;
-                                showPopup('Defects',record.get('DE_Store'),[
-                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://' + App.ENV + '.rallydev.com/#/detail/defect/' + record.get('ObjectID') + '">' + val + '</a>'; }},
-                                    { text: 'Name',          dataIndex: 'Name',          flex: 1    },
-                                    { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
-                                    { text: 'Release',       dataIndex: 'Release',       flex: 1,   renderer: function(val) { return val._refObjectName; } },
-                                    { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
-                                    { text: 'State',         dataIndex: 'State',         width: 75  },
-                                    { text: 'Work Product',  dataIndex: 'ParentText',    flex: 1    }
+                                if ((column == 3 && record.get('criticalDefectCount') == 0) ||
+                                    (column == 4 && record.get('highDefectCount')     == 0)) return;
+                                showPopup('Defects',record.get('defectRecords'),[
+                                    { text: 'ID',            dataIndex: 'FormattedID',  width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/defect/' + record.get('ObjectID') + '">' + val + '</a>'; }},
+                                    { text: 'Name',          dataIndex: 'Name',         flex : 1,                   },
+                                    { text: 'Project',       dataIndex: 'ProjectName',  width: 175, align: 'center' },
+                                    { text: 'Release',       dataIndex: 'Release',      flex : 1                    },
+                                    { text: 'Owner',         dataIndex: 'OwnerName',    width: 100, align: 'center' },
+                                    { text: 'State',         dataIndex: 'State',        width: 75,  align: 'center' },
+                                    { text: 'Work Product',  dataIndex: 'WorkProduct',  flex : 1                    }
                                 ],[{
                                     property : 'Severity',
                                     value    : (column == 3) ? 'Critical' : 'High'
                                 }]);
                             } else if (column == 5) { //Test Cases
-                                showPopup('Test Cases',record.get('TC_Store'),[
-                                    { text: 'ID',            dataIndex: 'FormattedID',   width: 60, renderer: function(val, meta, record) { return '<a href="https://' + App.ENV + '.rallydev.com/#/detail/testcase/' + record.get('ObjectID') + '">' + val + '</a>'; }},
-                                    { text: 'Name',          dataIndex: 'Name',          flex: 1    },
-                                    { text: 'Project',       dataIndex: 'ProjectName',   width: 175 },
-                                    { text: 'Owner',         dataIndex: 'OwnerName',     width: 100 },
-                                    { text: 'Work Product',  dataIndex: 'ParentText',    flex: 1    },
-                                    { text: 'Verdict',       dataIndex: 'LastVerdict',   width: 60  },
-                                    { text: 'Last Run',      dataIndex: 'LastRun',       width: 70, renderer: function(val) { return (val != undefined) ? val.substring(0,10) : '' } }
+                                showPopup('Test Cases',record.get('testcaseRecords'),[
+                                    { text: 'ID',            dataIndex: 'FormattedID',  width: 60, renderer: function(val, meta, record) { return '<a href="https://rally1.rallydev.com/#/detail/testcase/' + record.get('ObjectID') + '">' + val + '</a>'; }},
+                                    { text: 'Name',          dataIndex: 'Name',         flex: 1                     },
+                                    { text: 'Project',       dataIndex: 'ProjectName',  width: 175, align: 'center' },
+                                    { text: 'Owner',         dataIndex: 'OwnerName',    width: 100, align: 'center' },
+                                    { text: 'Work Product',  dataIndex: 'WorkProduct',  flex: 1                     },
+                                    { text: 'Verdict',       dataIndex: 'LastVerdict',  width: 100, align: 'center' },
+                                    { text: 'Last Run',      dataIndex: 'LastRun',      width: 70,  align: 'center', renderer: function(val) { return (val != undefined) ? val.substring(0,10) : '' } }
                                 ]);
                             }
 
@@ -387,11 +433,11 @@ Ext.define('CustomApp', {
                                     items: [{
                                         xtype             : 'rallygrid',
                                         layout            : 'fit',
-                                        showPagingToolbar : false,
+                                        showPagingtoolbar : false,
                                         disableSelection  : true,
                                         store : Ext.create('Rally.data.custom.Store', {
                                             data     : data,
-                                            fields   : ['Release','FormattedID','Name','ObjectID','LastRun','ProjectName','OwnerName','Severity','ScheduleState','TechnicalSME','BusinessSME','State','ParentText','LastVerdict'],
+                                            fields   : ['Release','FormattedID','Name','ObjectID','LastRun','ProjectName','OwnerName','Severity','ScheduleState','TechnicalSME','BusinessSME','State','WorkProduct','LastVerdict'],
                                             filters  : supFilter,
                                             sorters  : [{
                                                 property  : 'FormattedID',
@@ -413,7 +459,7 @@ Ext.define('CustomApp', {
                         }
                     }
                 });
-            }
+            }            
         }
     }
 });

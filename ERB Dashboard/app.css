@@ -2,16 +2,11 @@
 	margin: 5px 0 3px 5px;
 }
 
-.label {
-	width: 65px;
-	padding: 4px;
-	border-radius: 3px;
+.weekChangeBtn .x-btn-inner {
+	font-size   : 16px !important;
+	line-height : 8px  !important;
 }
 
-.note + .note {
-	margin-top: 5px;
+.x-trigger-cell {
+	display: none !important;
 }
-
-.green    { background: #C6EFCE; }
-.red      { background: #FFC7CE; }
-.yellow   { background: #FFEB9C; }
